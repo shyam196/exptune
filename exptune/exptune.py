@@ -1,25 +1,35 @@
 import abc
+import datetime
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+import pandas as pd
+import ray.tune as tune
 from ray import ObjectID
-from ray.tune import Stopper, Trainable
 from ray.tune.schedulers import TrialScheduler
 
 from .hyperparams import HyperParam
+from .search_strategies import SearchStrategy
 
 
 @dataclass
 class ExperimentSettings:
     exp_name: str
-    timestamp_experiment: bool = True
+    timestamp_experiment_name: bool = True
     checkpoint_freq: int = 0
     checkpoint_at_end: bool = True
     keep_checkpoints_num: int = 1
     reuse_actors: bool = False
     raise_on_failed_trial: bool = False
+
+    @property
+    def name(self):
+        if self.timestamp_experiment_name:
+            return f"{self.exp_name}_{datetime.now().strftime('%d-%m-%Y_%I-%M-%S_%p')}"
+        else:
+            return self.exp_name
 
 
 @dataclass
@@ -27,9 +37,8 @@ class TrialResources:
     cpus: float
     gpus: float
 
-
-class SearchStrategy(abc.ABCMeta):
-    pass
+    def as_dict(self) -> Dict[str, float]:
+        return {"cpu": self.cpus, "gpu": self.gpus}
 
 
 @dataclass
@@ -38,12 +47,25 @@ class Optimizer:
     lr_scheduler: Any
 
 
-class Summarizer(abc.ABCMeta):
-    def __call__(self, train_df, val_df, test_df):
+class ComposeStopper(tune.Stopper):
+    def __init__(self, stoppers: List[tune.Stopper]):
+        super().__init__()
+        self.stoppers = stoppers
+
+    def __call__(self, trial_id, result):
+        stop = [s(trial_id, result) for s in self.stoppers]
+        return any(stop)
+
+    def stop_all(self):
+        return any([s.stop_all() for s in self.stoppers])
+
+
+class SearchSummarizer(abc.ABC):
+    def __call__(self, search_data: pd.DataFrame):
         raise NotImplementedError
 
 
-class ExperimentConfig(abc.ABCMeta):
+class ExperimentConfig(abc.ABC):
     @abc.abstractmethod
     def settings(self) -> ExperimentSettings:
         raise NotImplementedError
@@ -74,7 +96,7 @@ class ExperimentConfig(abc.ABCMeta):
     def trial_metric(self) -> str:
         raise NotImplementedError
 
-    def trial_stoppers(self) -> List[Stopper]:
+    def stoppers(self) -> List[tune.Stopper]:
         return []
 
     def dataset_pin(self, debug_mode: bool) -> List[ObjectID]:
@@ -146,7 +168,7 @@ class ExperimentConfig(abc.ABCMeta):
     ) -> Dict[str, Any]:
         raise NotImplementedError
 
-    def summaries(self) -> List[Summarizer]:
+    def search_summaries(self) -> List[SearchSummarizer]:
         return []
 
     def __repr__(self):
@@ -159,7 +181,7 @@ _PINNED_OID_KEY = "pinned_obj_ids"
 _DEBUG_MODE_KEY = "debug_mode"
 
 
-class _ExperimentTrainable(Trainable):
+class _ExperimentTrainable(tune.Trainable):
     def _setup(self, config: Dict[str, Any]):
         self.exp_conf: ExperimentConfig = config[_EXP_CONF_KEY]
         self.debug_mode: bool = config[_DEBUG_MODE_KEY]
@@ -223,3 +245,42 @@ class _ExperimentTrainable(Trainable):
             self.hparams,
             self.extra,
         ) = self.exp_conf.restore_trial(Path(checkpoint_dir))
+
+
+def run_search(
+    experiment_config: ExperimentConfig, debug_mode=False
+) -> tune.ExperimentAnalysis:
+    search_strategy: SearchStrategy = experiment_config.search_strategy()
+    settings: ExperimentSettings = experiment_config.settings()
+
+    config = {
+        _EXP_CONF_KEY: experiment_config,
+        _DEBUG_MODE_KEY: debug_mode,
+        _PINNED_OID_KEY: experiment_config.dataset_pin(debug_mode),
+    }
+
+    # Set up hyperparameters
+    hparams = experiment_config.hyperparams()
+    for k, v in experiment_config.fixed_hyperparams().items():
+        hparams[k] = v
+    for k, v in hparams.items():
+        if isinstance(v, HyperParam):
+            hparams[k] = search_strategy.process_hparam(v)
+
+    config[_HPARAMS_KEY] = hparams
+
+    return tune.run(
+        _ExperimentTrainable,
+        name=settings.name,
+        stop=ComposeStopper(experiment_config.stoppers()),
+        config=config,
+        num_samples=search_strategy.num_samples(),
+        checkpoint_freq=settings.checkpoint_freq,
+        checkpoint_at_end=settings.checkpoint_at_end,
+        keep_checkpoints_num=settings.keep_checkpoints_num,
+        reuse_actors=settings.reuse_actors,
+        raise_on_failed_trial=settings.raise_on_failed_trial,
+    )
+
+
+# TODO: function for training final models from best configuration found by search
