@@ -8,6 +8,8 @@ from ray import ObjectID
 from ray.tune import Stopper, Trainable
 from ray.tune.schedulers import TrialScheduler
 
+from .hyperparams import HyperParam
+
 
 @dataclass
 class ExperimentSettings:
@@ -27,10 +29,6 @@ class TrialResources:
 
 
 class SearchStrategy(abc.ABCMeta):
-    pass
-
-
-class HyperParam(abc.ABCMeta):
     pass
 
 
