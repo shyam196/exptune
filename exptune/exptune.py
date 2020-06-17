@@ -156,7 +156,7 @@ class ExperimentConfig(abc.ABC):
     @abc.abstractmethod
     def test(
         self, model: Any, data: Any, extra: Any, debug_mode: bool
-    ) -> Dict[str, Any]:
+    ) -> Tuple[Dict[str, Any], Any]:
         raise NotImplementedError
 
     def search_summaries(self) -> List[SearchSummarizer]:
