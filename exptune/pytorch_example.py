@@ -50,14 +50,17 @@ class PytorchMnistMlpConfig(ExperimentConfig):
         return TrialResources(cpus=4, gpus=0.0)
 
     def hyperparams(self):
-        return {"lr": LogUniformHyperParam(1e-4, 1e-1, default=0.01)}
+        return {
+            "lr": LogUniformHyperParam(1e-4, 1e-1, default=0.01),
+            "wd": LogUniformHyperParam(1e-4, 1e-1, default=0.01),
+        }
 
     def search_strategy(self):
-        return RandomSearchStrategy(10)
+        return RandomSearchStrategy(num_samples=5)
 
     def trial_scheduler(self):
         return AsyncHyperBandScheduler(
-            metric=self.trial_metric(), mode="min", max_t=100, grace_period=10
+            metric=self.trial_metric(), mode="min", max_t=20, grace_period=10
         )
 
     def trial_metric(self):
