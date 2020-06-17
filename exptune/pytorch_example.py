@@ -47,7 +47,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
         torch.manual_seed(seed)
 
     def resource_requirements(self):
-        return TrialResources(cpus=2, gpus=0.5)
+        return TrialResources(cpus=4, gpus=0.0)
 
     def hyperparams(self):
         return {"lr": LogUniformHyperParam(1e-4, 1e-1, default=0.01)}
@@ -121,7 +121,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
 
     def persist_trial(self, checkpoint_dir, model, optimizer, hparams, extra):
         for item, path in zip(
-            [model, optimizer, optimizer.lr_scheduler, hparams],
+            [model, optimizer, extra.lr_scheduler, hparams],
             self.__checkpoint_paths(checkpoint_dir),
         ):
             torch.save(item, path)

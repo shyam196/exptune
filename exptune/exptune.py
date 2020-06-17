@@ -1,7 +1,7 @@
 import abc
-import datetime
 import pickle
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -163,7 +163,7 @@ class ExperimentConfig(abc.ABC):
         return []
 
     def __repr__(self):
-        return str(self.__name__)
+        return str(self.__class__.__name__)
 
 
 _EXP_CONF_KEY = "exp_conf_obj"
@@ -221,7 +221,7 @@ class _ExperimentTrainable(tune.Trainable):
         self._log_extra_info(t_extra, "train")
         self._log_extra_info(v_extra, "val")
 
-        return {**t_extra, **v_extra}
+        return {**t_metrics, **v_metrics}
 
     def _save(self, checkpoint_dir):
         self.exp_conf.persist_trial(
@@ -265,7 +265,9 @@ def run_search(
         name=settings.name,
         stop=ComposeStopper(experiment_config.stoppers()),
         config=config,
+        resources_per_trial=experiment_config.resource_requirements().as_dict(),
         num_samples=search_strategy.num_samples(),
+        scheduler=experiment_config.trial_scheduler(),
         checkpoint_freq=settings.checkpoint_freq,
         checkpoint_at_end=settings.checkpoint_at_end,
         keep_checkpoints_num=settings.keep_checkpoints_num,
