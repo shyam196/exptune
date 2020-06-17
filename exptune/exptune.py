@@ -40,11 +40,8 @@ class TrialResources:
     def as_dict(self) -> Dict[str, float]:
         return {"cpu": self.cpus, "gpu": self.gpus}
 
-
-@dataclass
-class Optimizer:
-    optimizer: Any
-    lr_scheduler: Any
+    def requests_gpu(self) -> bool:
+        return self.gpus > 0.0
 
 
 class ComposeStopper(tune.Stopper):
@@ -113,17 +110,11 @@ class ExperimentConfig(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def optimizer(
-        self, model: Any, hparams: Dict[str, Any], debug_mode: bool
-    ) -> Optimizer:
+    def optimizer(self, model: Any, hparams: Dict[str, Any], debug_mode: bool) -> Any:
         raise NotImplementedError
 
     def extra_setup(
-        self,
-        model: Any,
-        optimizer: Optimizer,
-        hparams: Dict[str, Any],
-        debug_mode: bool,
+        self, model: Any, optimizer: Any, hparams: Dict[str, Any], debug_mode: bool,
     ) -> Any:
         return None
 
@@ -132,7 +123,7 @@ class ExperimentConfig(abc.ABC):
         self,
         checkpoint_dir: Path,
         model: Any,
-        optimizer: Optimizer,
+        optimizer: Any,
         hparams: Dict[str, Any],
         extra: Any,
     ) -> None:
@@ -141,18 +132,18 @@ class ExperimentConfig(abc.ABC):
     @abc.abstractmethod
     def restore_trial(
         self, checkpoint_dir: Path
-    ) -> Tuple[Any, Optimizer, Dict[str, Any], Any]:
+    ) -> Tuple[Any, Any, Dict[str, Any], Any]:
         raise NotImplementedError
 
     def trial_update_hparams(
-        self, model: Any, optimizer: Optimizer, extra: Any, new_hparams: Dict[str, Any]
+        self, model: Any, optimizer: Any, extra: Any, new_hparams: Dict[str, Any]
     ) -> bool:
         # used by PBT
         return False
 
     @abc.abstractmethod
     def train(
-        self, model: Any, optimizer: Optimizer, data: Any, extra: Any, debug_mode: bool
+        self, model: Any, optimizer: Any, data: Any, extra: Any, debug_mode: bool
     ) -> Tuple[Dict[str, Any], Any]:
         raise NotImplementedError
 
@@ -192,7 +183,7 @@ class _ExperimentTrainable(tune.Trainable):
             pinned_object_ids, self.hparams, self.debug_mode
         )
         self.model: Any = self.exp_conf.model(self.hparams, self.debug_mode)
-        self.optimizer: Optimizer = self.exp_conf.optimizer(
+        self.optimizer: Any = self.exp_conf.optimizer(
             self.model, self.hparams, self.debug_mode
         )
         self.extra: Any = self.exp_conf.extra_setup(
@@ -214,7 +205,7 @@ class _ExperimentTrainable(tune.Trainable):
         with open(Path("extra_info") / f"{name}_{self.iteration}.pkl", "wb") as f:
             pickle.dump(data, f)
 
-    def train(self):
+    def _train(self):
         t_metrics: Dict[str, Any]
         t_extra: Any
         t_metrics, t_extra = self.exp_conf.train(
