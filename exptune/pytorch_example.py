@@ -41,7 +41,9 @@ class Extra:
 
 class PytorchMnistMlpConfig(ExperimentConfig):
     def settings(self):
-        return ExperimentSettings(exp_name="MnistMlpExample", final_max_iterations=10)
+        return ExperimentSettings(
+            exp_name="MnistMlpExample", final_max_iterations=10, final_repeats=4
+        )
 
     def configure_seeds(self, seed):
         torch.manual_seed(seed)
