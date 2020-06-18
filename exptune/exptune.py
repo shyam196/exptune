@@ -3,15 +3,23 @@ import pickle
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import ray.tune as tune
 from ray import ObjectID
+from ray.tune import ExperimentAnalysis
 from ray.tune.schedulers import TrialScheduler
 
 from .hyperparams import HyperParam
 from .search_strategies import SearchStrategy
+from .utils import (
+    DEBUG_MODE_KEY,
+    EXP_CONF_KEY,
+    HPARAMS_KEY,
+    PINNED_OID_KEY,
+    convert_experiment_analysis_to_df,
+)
 
 
 @dataclass
@@ -23,6 +31,10 @@ class ExperimentSettings:
     keep_checkpoints_num: int = 1
     reuse_actors: bool = False
     raise_on_failed_trial: bool = False
+    max_retries: int = 3
+    final_max_iterations: int = 100
+    final_repeats: int = 5
+    final_run_timeout: Optional[float] = None
 
     @property
     def name(self):
@@ -58,7 +70,12 @@ class ComposeStopper(tune.Stopper):
 
 
 class SearchSummarizer(abc.ABC):
-    def __call__(self, search_data: pd.DataFrame):
+    def __call__(self, search_df: pd.DataFrame) -> None:
+        raise NotImplementedError
+
+
+class FinalRunsSummarizer(abc.ABC):
+    def __call__(self, training_df: pd.DataFrame, test_df: pd.DataFrame) -> None:
         raise NotImplementedError
 
 
@@ -90,7 +107,7 @@ class ExperimentConfig(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def trial_metric(self) -> str:
+    def trial_metric(self) -> Tuple[str, str]:
         raise NotImplementedError
 
     def stoppers(self) -> List[tune.Stopper]:
@@ -162,22 +179,19 @@ class ExperimentConfig(abc.ABC):
     def search_summaries(self) -> List[SearchSummarizer]:
         return []
 
+    def final_runs_summaries(self) -> List[FinalRunsSummarizer]:
+        return []
+
     def __repr__(self):
         return str(self.__class__.__name__)
 
 
-_EXP_CONF_KEY = "exp_conf_obj"
-_HPARAMS_KEY = "hparams"
-_PINNED_OID_KEY = "pinned_obj_ids"
-_DEBUG_MODE_KEY = "debug_mode"
-
-
 class _ExperimentTrainable(tune.Trainable):
     def _setup(self, config: Dict[str, Any]):
-        self.exp_conf: ExperimentConfig = config[_EXP_CONF_KEY]
-        self.debug_mode: bool = config[_DEBUG_MODE_KEY]
-        self.hparams: Dict[str, Any] = config[_HPARAMS_KEY]
-        pinned_object_ids: List[ObjectID] = config[_PINNED_OID_KEY]
+        self.exp_conf: ExperimentConfig = config[EXP_CONF_KEY]
+        self.debug_mode: bool = config[DEBUG_MODE_KEY]
+        self.hparams: Dict[str, Any] = config[HPARAMS_KEY]
+        pinned_object_ids: List[ObjectID] = config[PINNED_OID_KEY]
 
         self.data: Any = self.exp_conf.data(
             pinned_object_ids, self.hparams, self.debug_mode
@@ -191,7 +205,7 @@ class _ExperimentTrainable(tune.Trainable):
         )
 
     def reset_config(self, new_config):
-        new_hparams: Dict[str, Any] = new_config[_HPARAMS_KEY]
+        new_hparams: Dict[str, Any] = new_config[HPARAMS_KEY]
         updated: bool = self.exp_conf.trial_update_hparams(
             self.model, self.optimizer, self.extra, new_hparams
         )
@@ -245,9 +259,9 @@ def run_search(
     settings: ExperimentSettings = experiment_config.settings()
 
     config = {
-        _EXP_CONF_KEY: experiment_config,
-        _DEBUG_MODE_KEY: debug_mode,
-        _PINNED_OID_KEY: experiment_config.dataset_pin(debug_mode),
+        EXP_CONF_KEY: experiment_config,
+        DEBUG_MODE_KEY: debug_mode,
+        PINNED_OID_KEY: experiment_config.dataset_pin(debug_mode),
     }
 
     # Set up hyperparameters
@@ -258,9 +272,9 @@ def run_search(
         if isinstance(v, HyperParam):
             hparams[k] = search_strategy.process_hparam(v)
 
-    config[_HPARAMS_KEY] = hparams
+    config[HPARAMS_KEY] = hparams
 
-    return tune.run(
+    analysis: ExperimentAnalysis = tune.run(
         _ExperimentTrainable,
         name=settings.name,
         stop=ComposeStopper(experiment_config.stoppers()),
@@ -273,7 +287,11 @@ def run_search(
         keep_checkpoints_num=settings.keep_checkpoints_num,
         reuse_actors=settings.reuse_actors,
         raise_on_failed_trial=settings.raise_on_failed_trial,
+        ray_auto_init=False,
     )
 
+    search_df: pd.DataFrame = convert_experiment_analysis_to_df(analysis)
+    for summarizer in experiment_config.search_summaries():
+        summarizer(search_df)
 
-# TODO: function for training final models from best configuration found by search
+    return analysis

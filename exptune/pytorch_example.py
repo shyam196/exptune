@@ -41,7 +41,7 @@ class Extra:
 
 class PytorchMnistMlpConfig(ExperimentConfig):
     def settings(self):
-        return ExperimentSettings(exp_name="MnistMlpExample")
+        return ExperimentSettings(exp_name="MnistMlpExample", final_max_iterations=10)
 
     def configure_seeds(self, seed):
         torch.manual_seed(seed)
@@ -52,19 +52,20 @@ class PytorchMnistMlpConfig(ExperimentConfig):
     def hyperparams(self):
         return {
             "lr": LogUniformHyperParam(1e-4, 1e-1, default=0.01),
-            "wd": LogUniformHyperParam(1e-4, 1e-1, default=0.01),
+            "wd": LogUniformHyperParam(1e-5, 1e-2, default=1e-4),
         }
 
     def search_strategy(self):
         return RandomSearchStrategy(num_samples=5)
 
     def trial_scheduler(self):
+        metric, mode = self.trial_metric()
         return AsyncHyperBandScheduler(
-            metric=self.trial_metric(), mode="min", max_t=20, grace_period=10
+            metric=metric, mode=mode, max_t=20, grace_period=10
         )
 
     def trial_metric(self):
-        return "val_loss"
+        return "val_loss", "min"
 
     def data(self, pinned_objs, hparams, debug_mode):
         transform = transforms.Compose(
@@ -106,7 +107,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
         return MnistMlp()
 
     def optimizer(self, model, hparams, debug_mode):
-        return Adam(model.parameters(), lr=hparams["lr"])
+        return Adam(model.parameters(), lr=hparams["lr"], weight_decay=hparams["wd"])
 
     def extra_setup(self, model, optimizer, hparams, debug_mode):
         return Extra(
@@ -207,7 +208,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
     def val(self, model, data, extra, debug_mode):
         metrics, extra_output = self.__eval("val", model, data, extra, debug_mode)
         # Cycle the LR scheduler along
-        extra.lr_scheduler.step(metrics[self.trial_metric()])
+        extra.lr_scheduler.step(metrics[self.trial_metric()[0]])
         return metrics, extra_output
 
     def test(self, model, data, extra, debug_mode):

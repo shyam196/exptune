@@ -1,15 +1,11 @@
 from collections import defaultdict
 from typing import Any, DefaultDict, Dict, List, Tuple
 
-import GPUtil
 import pandas as pd
 from rich.console import Console
 
 from .exptune import ExperimentConfig, HyperParam
-
-
-def _check_gpu_availability() -> bool:
-    return len(GPUtil.getAvailable()) > 0
+from .utils import check_gpu_availability
 
 
 def _get_default_hparams(config: ExperimentConfig) -> Dict[str, Any]:
@@ -39,7 +35,7 @@ def check_config(
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
 
     console: Console = Console(width=120)
-    if not _check_gpu_availability() and config.resource_requirements().requests_gpu():
+    if not check_gpu_availability() and config.resource_requirements().requests_gpu():
         console.log(
             "[bold red]Warning[/bold red]: GPU isn't available but config requests it; proceeding anyway"
         )
