@@ -12,6 +12,7 @@ from .exptune import (
     ComposeStopper,
     ExperimentConfig,
     ExperimentSettings,
+    Metric,
     TrialResources,
 )
 from .utils import check_gpu_availability
@@ -72,7 +73,8 @@ def _train_model(
     val_capture: List[Any] = []
     best_metric: Optional[float] = None
 
-    metric, mode = config.trial_metric()
+    metric: Metric = config.trial_metric()
+    metric_name, mode = metric.name, metric.mode
     cmp: Callable = lt if mode == "min" else gt
 
     for i in range(1, config.settings().final_max_iterations + 1):
@@ -84,8 +86,8 @@ def _train_model(
         v_metrics, v_extra = config.val(model, data, extra, debug_mode=False)
         val_capture.append(v_extra)
 
-        if best_metric is None or cmp(v_metrics[metric], best_metric):
-            best_metric = v_metrics[metric]
+        if best_metric is None or cmp(v_metrics[metric_name], best_metric):
+            best_metric = v_metrics[metric_name]
             config.persist_trial(results_dir, model, optimizer, hparams, extra)
 
         combined_metrics: Dict[str, Any] = {**t_metrics, **v_metrics}

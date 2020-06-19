@@ -11,9 +11,10 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
-from .exptune import ExperimentConfig, ExperimentSettings, TrialResources
-from .hyperparams import LogUniformHyperParam
-from .search_strategies import RandomSearchStrategy
+from exptune.exptune import ExperimentConfig, ExperimentSettings, Metric, TrialResources
+from exptune.hyperparams import LogUniformHyperParam
+from exptune.search_strategies import RandomSearchStrategy
+from exptune.summaries.search_summaries import HyperParamReport
 
 
 def _trim_dataset_for_debug(dataset, prop=0.1):
@@ -40,9 +41,16 @@ class Extra:
 
 
 class PytorchMnistMlpConfig(ExperimentConfig):
+    def __init__(self, experiment_dir: Path = Path("~/pytorch_example/test")):
+        super().__init__()
+        self.experiment_dir = experiment_dir
+
     def settings(self):
         return ExperimentSettings(
-            exp_name="MnistMlpExample", final_max_iterations=10, final_repeats=4
+            exp_name="MnistMlpExample",
+            final_max_iterations=10,
+            final_repeats=4,
+            exp_directory=self.experiment_dir,
         )
 
     def configure_seeds(self, seed):
@@ -58,16 +66,26 @@ class PytorchMnistMlpConfig(ExperimentConfig):
         }
 
     def search_strategy(self):
-        return RandomSearchStrategy(num_samples=5)
+        return RandomSearchStrategy(num_samples=50)
+
+    def search_summaries(self):
+        return [
+            HyperParamReport(
+                self.hyperparams(),
+                self.trial_metric(),
+                [Metric("val_accuracy", "max")],
+                self.experiment_dir / "report.html",
+            )
+        ]
 
     def trial_scheduler(self):
-        metric, mode = self.trial_metric()
+        metric: Metric = self.trial_metric()
         return AsyncHyperBandScheduler(
-            metric=metric, mode=mode, max_t=20, grace_period=10
+            metric=metric.name, mode=metric.mode, max_t=20, grace_period=10
         )
 
     def trial_metric(self):
-        return "val_loss", "min"
+        return Metric("val_loss", "min")
 
     def data(self, pinned_objs, hparams, debug_mode):
         transform = transforms.Compose(
@@ -210,7 +228,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
     def val(self, model, data, extra, debug_mode):
         metrics, extra_output = self.__eval("val", model, data, extra, debug_mode)
         # Cycle the LR scheduler along
-        extra.lr_scheduler.step(metrics[self.trial_metric()[0]])
+        extra.lr_scheduler.step(metrics[self.trial_metric().name])
         return metrics, extra_output
 
     def test(self, model, data, extra, debug_mode):

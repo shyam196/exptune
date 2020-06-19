@@ -68,6 +68,7 @@ def check_config(
 
     console.log("\n\nTraining finished; testing...")
     test_metrics, test_extra = config.test(model, data, extra, debug_mode)
-    console.log(t_metrics, t_extra)
+    console.log(test_metrics)
+    console.log(test_extra)
 
     return pd.DataFrame(complete_metrics), test_metrics

@@ -35,5 +35,5 @@ def convert_experiment_analysis_to_df(analysis: ExperimentAnalysis) -> pd.DataFr
         processed_dfs.append(pd.merge(df, hparams_df, on="experiment_id"))
 
     df = pd.concat(processed_dfs)
-    df = df.rename(columns={"experiment_id": "trial_id"})
+    # df = df.rename(columns={"experiment_id": "trial_id"})
     return df

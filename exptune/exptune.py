@@ -11,9 +11,9 @@ from ray import ObjectID
 from ray.tune import ExperimentAnalysis
 from ray.tune.schedulers import TrialScheduler
 
-from .hyperparams import HyperParam
-from .search_strategies import SearchStrategy
-from .utils import (
+from exptune.hyperparams import HyperParam
+from exptune.search_strategies import SearchStrategy
+from exptune.utils import (
     DEBUG_MODE_KEY,
     EXP_CONF_KEY,
     HPARAMS_KEY,
@@ -25,6 +25,7 @@ from .utils import (
 @dataclass
 class ExperimentSettings:
     exp_name: str
+    exp_directory: Path
     timestamp_experiment_name: bool = True
     checkpoint_freq: int = 0
     checkpoint_at_end: bool = True
@@ -35,6 +36,9 @@ class ExperimentSettings:
     final_max_iterations: int = 100
     final_repeats: int = 5
     final_run_timeout: Optional[float] = None
+
+    def __post_init__(self):
+        self.exp_directory = self.exp_directory.expanduser()
 
     @property
     def name(self):
@@ -54,6 +58,16 @@ class TrialResources:
 
     def requests_gpu(self) -> bool:
         return self.gpus > 0.0
+
+
+@dataclass
+class Metric:
+    name: str
+    mode: str  # either "max" or "min"
+
+    def __post_init__(self):
+        if self.mode not in ["min", "max"]:
+            raise ValueError(f"{self.mode} is not a valid setting for metric mode")
 
 
 class ComposeStopper(tune.Stopper):
@@ -107,7 +121,7 @@ class ExperimentConfig(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def trial_metric(self) -> Tuple[str, str]:
+    def trial_metric(self) -> Metric:
         raise NotImplementedError
 
     def stoppers(self) -> List[tune.Stopper]:
@@ -255,8 +269,17 @@ class _ExperimentTrainable(tune.Trainable):
 def run_search(
     experiment_config: ExperimentConfig, debug_mode=False
 ) -> tune.ExperimentAnalysis:
-    search_strategy: SearchStrategy = experiment_config.search_strategy()
     settings: ExperimentSettings = experiment_config.settings()
+    # Make the experiment directory
+    if settings.exp_directory.exists():
+        print(
+            f"Experiment directory ({settings.exp_directory}) already exists; continuing..."
+        )
+    else:
+        print(f"Creating experiment directory ({settings.exp_directory})")
+        settings.exp_directory.mkdir(parents=True)
+
+    search_strategy: SearchStrategy = experiment_config.search_strategy()
 
     config = {
         EXP_CONF_KEY: experiment_config,
@@ -291,6 +314,10 @@ def run_search(
     )
 
     search_df: pd.DataFrame = convert_experiment_analysis_to_df(analysis)
+    search_df.to_pickle(str(settings.exp_directory / "search_df.pickle"))
+    with open(settings.exp_directory / "exp_analysis.pickle", "wb") as f:
+        pickle.dump(analysis, f)
+
     for summarizer in experiment_config.search_summaries():
         summarizer(search_df)
 
