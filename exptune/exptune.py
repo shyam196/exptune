@@ -323,3 +323,11 @@ def run_search(
         summarizer(search_df)
 
     return analysis
+
+
+def get_best_hyperparams(
+    analysis: tune.ExperimentAnalysis, metric: Metric
+) -> Dict[str, Any]:
+    best_config: Dict[str, Any] = analysis.get_best_config(metric.name, metric.mode)
+    hparams: Dict[str, Any] = best_config[HPARAMS_KEY]
+    return hparams
