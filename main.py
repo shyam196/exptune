@@ -15,5 +15,7 @@ if __name__ == "__main__":
     analysis = run_search(conf, debug_mode=True)
     # TODO: use search analysis to inform training of final models
     train_final_models(
-        conf, {"lr": 0.01, "wd": 1e-4}, Path("~pytorch_example/run_final/").expanduser()
+        conf,
+        {"lr": 0.01, "wd": 1e-4},
+        Path("~/pytorch_example/run_final/").expanduser(),
     )

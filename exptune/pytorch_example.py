@@ -14,6 +14,13 @@ from torchvision import datasets, transforms
 from exptune.exptune import ExperimentConfig, ExperimentSettings, Metric, TrialResources
 from exptune.hyperparams import LogUniformHyperParam
 from exptune.search_strategies import RandomSearchStrategy
+from exptune.summaries.final_run_summaries import (
+    TestMetricSummaries,
+    TestQuantityScatterMatrix,
+    TrainingQuantityScatterMatrix,
+    TrialCurvePlotter,
+    ViolinPlotter,
+)
 from exptune.summaries.search_summaries import HyperParamReport
 
 
@@ -233,3 +240,24 @@ class PytorchMnistMlpConfig(ExperimentConfig):
 
     def test(self, model, data, extra, debug_mode):
         return self.__eval("test", model, data, extra, debug_mode)
+
+    def final_runs_summaries(self):
+        path = self.settings().exp_directory / "final_runs_summaries"
+        return [
+            TestMetricSummaries(),
+            TrainingQuantityScatterMatrix(
+                [
+                    "train_loss",
+                    "train_accuracy",
+                    "val_loss",
+                    "val_accuracy",
+                    "training_iteration",
+                ],
+                path / "train_scatter.html",
+            ),
+            TestQuantityScatterMatrix(
+                ["test_loss", "test_accuracy"], path / "test_scatter.html"
+            ),
+            TrialCurvePlotter(["val_loss", "train_loss"], path / "curves.html"),
+            ViolinPlotter(["test_loss"], path / "violins.html"),
+        ]

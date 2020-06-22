@@ -1,3 +1,4 @@
+import traceback
 from operator import gt, lt
 from pathlib import Path
 from pprint import pprint
@@ -48,70 +49,79 @@ def _train_model(
     results_dir: Path,
     pinned_objs: List[ray.ObjectID],
     use_tensorboard: bool,
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> Optional[Tuple[pd.DataFrame, pd.DataFrame]]:
 
-    print(results_dir)
-    if not check_gpu_availability() and config.resource_requirements().requests_gpu():
-        raise ValueError("GPU required for training this model")
+    try:
+        print(results_dir)
+        if (
+            not check_gpu_availability()
+            and config.resource_requirements().requests_gpu()
+        ):
+            raise ValueError("GPU required for training this model")
 
-    results_dir.mkdir()
-    summary_writer: Optional[SummaryWriter] = None
-    if use_tensorboard:
-        summary_writer = SummaryWriter(str(results_dir / "tensorboard"))
+        results_dir.mkdir(exist_ok=True)
+        summary_writer: Optional[SummaryWriter] = None
+        if use_tensorboard:
+            summary_writer = SummaryWriter(str(results_dir / "tensorboard"))
 
-    # Seeds should be independent since each run takes place inside its own ray worker
-    config.configure_seeds(trial_id)
+        # Seeds should be independent since each run takes place inside its own ray worker
+        config.configure_seeds(trial_id)
 
-    data: Any = config.data(pinned_objs, hparams, debug_mode=False)
-    model: Any = config.model(hparams, debug_mode=False)
-    optimizer: Any = config.optimizer(model, hparams, debug_mode=False)
-    extra: Any = config.extra_setup(model, optimizer, hparams, debug_mode=False)
-    stopper: ComposeStopper = ComposeStopper(config.stoppers())
+        data: Any = config.data(pinned_objs, hparams, debug_mode=False)
+        model: Any = config.model(hparams, debug_mode=False)
+        optimizer: Any = config.optimizer(model, hparams, debug_mode=False)
+        extra: Any = config.extra_setup(model, optimizer, hparams, debug_mode=False)
+        stopper: ComposeStopper = ComposeStopper(config.stoppers())
 
-    results: List[Dict[str, Any]] = []
-    train_capture: List[Any] = []
-    val_capture: List[Any] = []
-    best_metric: Optional[float] = None
+        results: List[Dict[str, Any]] = []
+        train_capture: List[Any] = []
+        val_capture: List[Any] = []
+        best_metric: Optional[float] = None
 
-    metric: Metric = config.trial_metric()
-    metric_name, mode = metric.name, metric.mode
-    cmp: Callable = lt if mode == "min" else gt
+        metric: Metric = config.trial_metric()
+        metric_name, mode = metric.name, metric.mode
+        cmp: Callable = lt if mode == "min" else gt
 
-    for i in range(1, config.settings().final_max_iterations + 1):
-        t_metrics, t_extra = config.train(
-            model, optimizer, data, extra, debug_mode=False
-        )
-        train_capture.append(t_extra)
+        for i in range(1, config.settings().final_max_iterations + 1):
+            t_metrics, t_extra = config.train(
+                model, optimizer, data, extra, debug_mode=False
+            )
+            train_capture.append(t_extra)
 
-        v_metrics, v_extra = config.val(model, data, extra, debug_mode=False)
-        val_capture.append(v_extra)
+            v_metrics, v_extra = config.val(model, data, extra, debug_mode=False)
+            val_capture.append(v_extra)
 
-        if best_metric is None or cmp(v_metrics[metric_name], best_metric):
-            best_metric = v_metrics[metric_name]
-            config.persist_trial(results_dir, model, optimizer, hparams, extra)
+            if best_metric is None or cmp(v_metrics[metric_name], best_metric):
+                best_metric = v_metrics[metric_name]
+                config.persist_trial(results_dir, model, optimizer, hparams, extra)
 
-        combined_metrics: Dict[str, Any] = {**t_metrics, **v_metrics}
-        _log_to_tensorboard(summary_writer, combined_metrics, i)
-        results.append(
-            {"trial_id": trial_id, "training_iteration": i, **combined_metrics}
-        )
-        stop: bool = stopper(trial_id, combined_metrics)
-        if stop:
-            break
+            combined_metrics: Dict[str, Any] = {**t_metrics, **v_metrics}
+            _log_to_tensorboard(summary_writer, combined_metrics, i)
+            results.append(
+                {"trial_id": trial_id, "training_iteration": i, **combined_metrics}
+            )
+            stop: bool = stopper(trial_id, combined_metrics)
+            if stop:
+                break
 
-    # Restore model to the one where the best validation metric was recorded, and test
-    model, optimizer, hparams, extra = config.restore_trial(results_dir)
-    test_metrics, test_extra = config.test(model, data, extra, debug_mode=False)
-    print(f"\nTrial {trial_id}:")
-    pprint(test_metrics)
+        # Restore model to the one where the best validation metric was recorded, and test
+        model, optimizer, hparams, extra = config.restore_trial(results_dir)
+        test_metrics, test_extra = config.test(model, data, extra, debug_mode=False)
+        print(f"\nTrial {trial_id}:")
+        pprint(test_metrics)
 
-    test_metrics["trial_id"] = trial_id
-    test_df = pd.DataFrame(test_metrics, index=["trial_id"])
+        test_metrics["trial_id"] = trial_id
+        test_df = pd.DataFrame(test_metrics, index=["trial_id"])
 
-    if summary_writer is not None:
-        summary_writer.close()
+        if summary_writer is not None:
+            summary_writer.close()
 
-    return pd.DataFrame(results), test_df
+        return pd.DataFrame(results), test_df
+
+    except Exception:
+        print(f"Trial {trial_id} unexpectedly died!")
+        traceback.print_exc()
+        return None
 
 
 def train_final_models(
@@ -126,7 +136,7 @@ def train_final_models(
     pinned_objs: List[ray.ObjectID] = config.dataset_pin(debug_mode=False)
 
     if not out_dir.exists():
-        out_dir.mkdir()
+        out_dir.mkdir(parents=True, exist_ok=True)
 
     runs: List[ray.TaskID] = []
     for i in range(1, settings.final_repeats + 1):
@@ -140,19 +150,23 @@ def train_final_models(
         )
 
     print("Waiting for runs...")
-    results: List[Tuple[pd.DataFrame, Dict[str, Any]]] = ray.get(
+    results: List[Optional[Tuple[pd.DataFrame, pd.DataFrame]]] = ray.get(
         runs, timeout=settings.final_run_timeout
     )
     print("Runs finished!")
+    results_without_fails: List[Tuple[pd.DataFrame, pd.DataFrame]] = [
+        r for r in results if r is not None
+    ]
 
-    train_df: pd.DataFrame = pd.concat([r[0] for r in results])
-    test_df: pd.DataFrame = pd.concat([r[1] for r in results])
-
-    for summarizer in config.final_runs_summaries():
-        summarizer(train_df, test_df)
+    train_df: pd.DataFrame = pd.concat([r[0] for r in results_without_fails])
+    test_df: pd.DataFrame = pd.concat([r[1] for r in results_without_fails])
 
     print("Saving results")
     train_df.to_pickle(str(out_dir / "train_dataframe.pickle"))
     test_df.to_pickle(str(out_dir / "test_dataframe.pickle"))
+
+    print("Summarizing results")
+    for summarizer in config.final_runs_summaries():
+        summarizer(train_df, test_df)
 
     return train_df, test_df

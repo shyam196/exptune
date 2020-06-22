@@ -12,6 +12,7 @@ from sklearn.gaussian_process.kernels import Matern
 
 from exptune.exptune import Metric, SearchSummarizer
 from exptune.hyperparams import HyperParam, LogUniformHyperParam
+from exptune.summaries.plotly_utils import write_figs
 
 _THEME = "plotly_white"
 
@@ -36,15 +37,11 @@ def _plot_surface(
         random_state=0,
     )
 
-    print(df)
-
     if isinstance(param1[1], LogUniformHyperParam):
         df[param1[0]] = np.log10(df[param1[0]])
 
     if isinstance(param2[1], LogUniformHyperParam):
         df[param2[0]] = np.log10(df[param2[0]])
-
-    # print(df)
 
     x = np.array([df[param1[0]], df[param2[0]]])
 
@@ -255,22 +252,6 @@ def _single_hparam_plot(
     return fig
 
 
-def _write_figs(figs: List[go.Figure], out_path: Path):
-    include_js = True
-    with open(out_path.expanduser(), "w") as f:
-        f.write("<html><head></head><body>\n")
-        for fig in figs:
-            fig.write_html(
-                f,
-                include_plotlyjs=include_js,
-                full_html=False,
-                auto_open=False,
-                default_height="60%",
-            )
-            include_js = False
-        f.write("</body></html>\n")
-
-
 class HyperParamReport(SearchSummarizer):
     def __init__(
         self,
@@ -300,4 +281,4 @@ class HyperParamReport(SearchSummarizer):
         for hparam in self.hyperparameters.items():
             figs.append(_single_hparam_plot(search_df, self.primary_metric, hparam))
 
-        _write_figs(figs, self.out_path)
+        write_figs(figs, self.out_path)

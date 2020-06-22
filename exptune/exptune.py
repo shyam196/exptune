@@ -318,6 +318,7 @@ def run_search(
     with open(settings.exp_directory / "exp_analysis.pickle", "wb") as f:
         pickle.dump(analysis, f)
 
+    print("Summarizing search results")
     for summarizer in experiment_config.search_summaries():
         summarizer(search_df)
 
