@@ -293,7 +293,7 @@ def run_search(
         hparams[k] = v
     for k, v in hparams.items():
         if isinstance(v, HyperParam):
-            hparams[k] = search_strategy.process_hparam(v)
+            hparams[k] = search_strategy.process_hparam((k, v))
 
     config[HPARAMS_KEY] = hparams
 

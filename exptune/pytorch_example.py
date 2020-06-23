@@ -13,7 +13,7 @@ from torchvision import datasets, transforms
 
 from exptune.exptune import ExperimentConfig, ExperimentSettings, Metric, TrialResources
 from exptune.hyperparams import LogUniformHyperParam, UniformHyperParam
-from exptune.search_strategies import RandomSearchStrategy
+from exptune.search_strategies import GridSearchStrategy
 from exptune.summaries.final_run_summaries import (
     TestMetricSummaries,
     TestQuantityScatterMatrix,
@@ -75,7 +75,8 @@ class PytorchMnistMlpConfig(ExperimentConfig):
         }
 
     def search_strategy(self):
-        return RandomSearchStrategy(num_samples=50)
+        # return RandomSearchStrategy(num_samples=50)
+        return GridSearchStrategy({"lr": 4, "dropout": 4})
 
     def search_summaries(self):
         return [
@@ -261,5 +262,5 @@ class PytorchMnistMlpConfig(ExperimentConfig):
                 ["test_loss", "test_accuracy"], path / "test_scatter.html"
             ),
             TrialCurvePlotter(["val_loss", "train_loss"], path / "curves.html"),
-            ViolinPlotter(["test_loss"], path / "violins.html"),
+            ViolinPlotter(["test_loss", "test_accuracy"], path / "violins.html"),
         ]
