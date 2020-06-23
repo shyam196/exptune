@@ -30,8 +30,8 @@ def _plot_surface(
         df = grouped.max()
 
     gp = GaussianProcessRegressor(
-        kernel=Matern(nu=1.5),
-        alpha=1e-2,
+        kernel=Matern(nu=2.5),
+        alpha=1e-1,
         normalize_y=True,
         n_restarts_optimizer=50,
         random_state=0,
@@ -279,66 +279,14 @@ def _single_hparam_plot(
     else:
         df = grouped.max()
 
-    if isinstance(param[1], LogUniformHyperParam):
-        df[param[0]] = np.log10(df[param[0]])
-
-    gp = GaussianProcessRegressor(
-        kernel=Matern(nu=1.5),
-        alpha=1e-2,
-        normalize_y=True,
-        n_restarts_optimizer=50,
-        random_state=0,
-    )
-
-    gp.fit(np.array(df[param[0]])[:, np.newaxis], df[metric.name])
-
-    x = np.linspace(df[param[0]].min(), df[param[0]].max(), 500)
-    y, std = gp.predict(x.reshape(-1, 1), return_std=True)
-
-    points = go.Scatter(
-        x=df[param[0]],
-        y=df[metric.name],
-        mode="markers",
-        name="Evaluations",
-        line=dict(color="rgb(55, 55, 255)"),
-    )
-
-    upper = go.Scatter(
-        x=x,
-        y=y + std,
-        name="GP Upper",
-        mode="lines",
-        marker=dict(color="#444"),
-        line=dict(width=0),
-        fillcolor="rgba(255, 68, 68, 0.15)",
-        fill="tonexty",
-    )
-    gp_mean = go.Scatter(
-        x=x,
-        y=y,
-        name="GP Mean",
-        mode="lines",
-        line=dict(color="rgb(255, 10, 10)"),
-        fillcolor="rgba(255, 68, 68, 0.15)",
-        fill="tonexty",
-    )
-    lower = go.Scatter(
-        x=x,
-        y=y - std,
-        name="GP Lower",
-        marker=dict(color="#444"),
-        line=dict(width=0),
-        mode="lines",
-    )
-
-    fig = go.Figure(data=[lower, gp_mean, upper, points])
-
-    fig.update_layout(
+    fig = px.scatter(
+        df,
+        x=param[0],
+        y=metric.name,
+        log_x=isinstance(param[1], LogUniformHyperParam),
+        trendline="lowess",
+        hover_data=df.columns,
         title=f"{metric.name} - {param[0]}",
-        xaxis_title=f"log10({param[0]})"
-        if isinstance(param[1], LogUniformHyperParam)
-        else param[0],
-        yaxis_title=metric.name,
     )
 
     fig.layout.template = _THEME

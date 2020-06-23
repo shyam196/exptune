@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
 from exptune.exptune import ExperimentConfig, ExperimentSettings, Metric, TrialResources
-from exptune.hyperparams import ChoiceHyperParam, LogUniformHyperParam
+from exptune.hyperparams import LogUniformHyperParam, UniformHyperParam
 from exptune.search_strategies import RandomSearchStrategy
 from exptune.summaries.final_run_summaries import (
     TestMetricSummaries,
@@ -29,14 +29,16 @@ def _trim_dataset_for_debug(dataset, prop=0.1):
 
 
 class MnistMlp(nn.Module):
-    def __init__(self, width):
+    def __init__(self, width, dropout_p):
         super().__init__()
         self.fc1 = nn.Linear(784, width)
         self.fc2 = nn.Linear(width, 10)
+        self.dropout = nn.Dropout(dropout_p)
 
     def forward(self, x):
         x = torch.reshape(x, (-1, 784))
         x = F.relu(self.fc1(x))
+        x = self.dropout(x)
         x = F.log_softmax(self.fc2(x), dim=1)
         return x
 
@@ -69,8 +71,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
     def hyperparams(self):
         return {
             "lr": LogUniformHyperParam(1e-4, 1e-1, default=0.01),
-            "layer_width": ChoiceHyperParam([64, 128, 256], default=128),
-            "batch_size": ChoiceHyperParam([16, 32, 64], default=32),
+            "dropout": UniformHyperParam(0.0, 0.8, default=0.5),
         }
 
     def search_strategy(self):
@@ -126,15 +127,13 @@ class PytorchMnistMlpConfig(ExperimentConfig):
             test_dataset = _trim_dataset_for_debug(train_dataset)
 
         return {
-            "train": DataLoader(
-                train_split, batch_size=int(hparams["batch_size"]), shuffle=True
-            ),
+            "train": DataLoader(train_split, batch_size=32, shuffle=True),
             "val": DataLoader(val_split, batch_size=512, shuffle=False),
             "test": DataLoader(test_dataset, batch_size=512, shuffle=False),
         }
 
     def model(self, hparams, debug_mode):
-        return MnistMlp(hparams["layer_width"])
+        return MnistMlp(128, hparams["dropout"])
 
     def optimizer(self, model, hparams, debug_mode):
         return Adam(model.parameters(), lr=hparams["lr"])
