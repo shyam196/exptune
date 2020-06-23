@@ -11,7 +11,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern
 
 from exptune.exptune import Metric, SearchSummarizer
-from exptune.hyperparams import HyperParam, LogUniformHyperParam
+from exptune.hyperparams import ChoiceHyperParam, HyperParam, LogUniformHyperParam
 from exptune.summaries.plotly_utils import write_figs
 
 _THEME = "plotly_white"
@@ -30,10 +30,10 @@ def _plot_surface(
         df = grouped.max()
 
     gp = GaussianProcessRegressor(
-        kernel=Matern(nu=2.5),
+        kernel=Matern(nu=1.5),
         alpha=1e-2,
         normalize_y=True,
-        n_restarts_optimizer=10,
+        n_restarts_optimizer=50,
         random_state=0,
     )
 
@@ -113,7 +113,7 @@ def _plot_surface(
     )
 
     fig.update_layout(
-        title=f"{metric.name} Surface ({xlabel}--{ylabel})",
+        title=f"{metric.name} Surface ({xlabel} - {ylabel})",
         scene1=scene_dict,
         scene2=scene_dict,
         scene3=scene_dict,
@@ -122,6 +122,100 @@ def _plot_surface(
     fig.layout.template = _THEME
 
     return fig
+
+
+def _plot_single_categorical(
+    search_df: pd.DataFrame,
+    metric: Metric,
+    param1: Tuple[str, HyperParam],
+    param2: Tuple[str, HyperParam],
+) -> go.Figure:
+    grouped = search_df.groupby("trial_id")[[metric.name, param1[0], param2[0]]]
+    if metric.mode == "min":
+        df = grouped.min()
+    else:
+        df = grouped.max()
+
+    metric_column = df[metric.name]
+    if metric.mode == "min":
+        min_color = metric_column.min()
+        max_color = np.percentile(metric_column, 50)
+    else:
+        min_color = np.percentile(metric_column, 50)
+        max_color = metric_column.max()
+
+    fig = px.scatter(
+        df,
+        x=param1[0],
+        y=param2[0],
+        color=metric.name,
+        color_continuous_scale=px.colors.diverging.Tealrose,
+        range_color=(min_color, max_color),
+        hover_data=df.columns,
+        log_x=isinstance(param1[1], LogUniformHyperParam),
+        log_y=isinstance(param2[1], LogUniformHyperParam),
+        title=f"{metric.name} Categorical Cross Scatter ({param1[0]} - {param2[0]})",
+    )
+    fig.layout.template = _THEME
+
+    return fig
+
+
+def _plot_double_categorical(
+    search_df: pd.DataFrame,
+    metric: Metric,
+    param1: Tuple[str, HyperParam],
+    param2: Tuple[str, HyperParam],
+) -> go.Figure:
+    grouped = search_df.groupby("trial_id")[[metric.name, param1[0], param2[0]]]
+    if metric.mode == "min":
+        df = grouped.min()
+    else:
+        df = grouped.max()
+
+    metric_column = df[metric.name]
+    if metric.mode == "min":
+        min_color = metric_column.min()
+        max_color = np.percentile(metric_column, 50)
+    else:
+        min_color = np.percentile(metric_column, 50)
+        max_color = metric_column.max()
+
+    # Handle duplicated values
+    grouped = df.groupby([param1[0], param2[0]])
+    if metric.mode == "min":
+        df = grouped.min()
+    else:
+        df = grouped.max()
+
+    df = df.reset_index()
+
+    fig = px.scatter(
+        df,
+        x=param1[0],
+        y=param2[0],
+        size=metric.name,
+        color=metric.name,
+        color_continuous_scale=px.colors.diverging.Tealrose,
+        range_color=(min_color, max_color),
+        hover_data=df.columns,
+        title=f"{metric.name} Categorical Cross Scatter ({param1[0]} - {param2[0]})",
+    )
+    fig.layout.template = _THEME
+    return fig
+
+
+def _count_categorical(
+    param1: Tuple[str, HyperParam], param2: Tuple[str, HyperParam]
+) -> int:
+    num: int = 0
+    if isinstance(param1[1], ChoiceHyperParam):
+        num += 1
+
+    if isinstance(param2[1], ChoiceHyperParam):
+        num += 1
+
+    return num
 
 
 def _plot_parallel(
@@ -155,18 +249,18 @@ def _plot_parallel(
         min_color = np.percentile(df[primary_metric.name], 50)
         max_color = df[primary_metric.name].max()
 
-    dimensions: Dict[str, str] = {
+    labels: Dict[str, str] = {
         metric.name: metric.name for metric in aux_metrics + [primary_metric]
     }
     for name, hparam in params.items():
         if isinstance(hparam, LogUniformHyperParam):
-            dimensions[name] = f"log10({name})"
+            labels[name] = f"log10({name})"
         else:
-            dimensions[name] = name
+            labels[name] = name
 
     fig = px.parallel_coordinates(
         df,
-        dimensions=dimensions,
+        labels=labels,
         color=primary_metric.name,
         color_continuous_scale=px.colors.diverging.Tealrose,
         range_color=(min_color, max_color),
@@ -189,10 +283,10 @@ def _single_hparam_plot(
         df[param[0]] = np.log10(df[param[0]])
 
     gp = GaussianProcessRegressor(
-        kernel=Matern(nu=2.5),
+        kernel=Matern(nu=1.5),
         alpha=1e-2,
         normalize_y=True,
-        n_restarts_optimizer=10,
+        n_restarts_optimizer=50,
         random_state=0,
     )
 
@@ -240,7 +334,7 @@ def _single_hparam_plot(
     fig = go.Figure(data=[lower, gp_mean, upper, points])
 
     fig.update_layout(
-        title=f"{metric.name}--{param[0]}",
+        title=f"{metric.name} - {param[0]}",
         xaxis_title=f"log10({param[0]})"
         if isinstance(param[1], LogUniformHyperParam)
         else param[0],
@@ -276,9 +370,28 @@ class HyperParamReport(SearchSummarizer):
         )
 
         for hparam1, hparam2 in itertools.combinations(self.hyperparameters.items(), 2):
-            figs.append(_plot_surface(search_df, self.primary_metric, hparam1, hparam2))
+            num_categorical: int = _count_categorical(hparam1, hparam2)
+            if num_categorical == 0:
+                figs.append(
+                    _plot_surface(search_df, self.primary_metric, hparam1, hparam2)
+                )
+            elif num_categorical == 1:
+                figs.append(
+                    _plot_single_categorical(
+                        search_df, self.primary_metric, hparam1, hparam2
+                    )
+                )
+
+            elif num_categorical == 2:
+                figs.append(
+                    _plot_double_categorical(
+                        search_df, self.primary_metric, hparam1, hparam2
+                    )
+                )
 
         for hparam in self.hyperparameters.items():
+            if isinstance(hparam[1], ChoiceHyperParam):
+                continue
             figs.append(_single_hparam_plot(search_df, self.primary_metric, hparam))
 
         write_figs(figs, self.out_path)

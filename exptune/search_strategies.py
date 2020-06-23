@@ -1,9 +1,15 @@
 import abc
 from typing import Any
 
+import numpy as np
 from ray.tune import loguniform, sample_from, uniform
 
-from .hyperparams import HyperParam, LogUniformHyperParam, UniformHyperParam
+from .hyperparams import (
+    ChoiceHyperParam,
+    HyperParam,
+    LogUniformHyperParam,
+    UniformHyperParam,
+)
 
 
 class SearchStrategy(abc.ABC):
@@ -14,6 +20,11 @@ class SearchStrategy(abc.ABC):
     @abc.abstractmethod
     def num_samples(self) -> int:
         raise NotImplementedError
+
+
+def _type_preserving_choice(*args, **kwargs):
+    # add .item to return a native python type so this will work with tensorboard logging
+    return sample_from(lambda _: np.random.choice(*args, **kwargs).item())
 
 
 class RandomSearchStrategy(SearchStrategy):
@@ -29,5 +40,7 @@ class RandomSearchStrategy(SearchStrategy):
             return uniform(hparam.low, hparam.high)
         elif isinstance(hparam, LogUniformHyperParam):
             return loguniform(hparam.low, hparam.high)
+        elif isinstance(hparam, ChoiceHyperParam):
+            return _type_preserving_choice(hparam.choices)
         else:
             raise ValueError("Unsupported hyperparameter for random search")

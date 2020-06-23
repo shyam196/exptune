@@ -1,5 +1,5 @@
 import abc
-from typing import Any
+from typing import Any, List
 
 
 class HyperParam(abc.ABC):
@@ -35,3 +35,16 @@ class LogUniformHyperParam(HyperParam):
 
     def __repr__(self):
         return f"LogUniform[{self.low}, {self.high}  (default={self.default})]"
+
+
+class ChoiceHyperParam(HyperParam):
+    def __init__(self, choices: List[Any], default: Any):
+        super().__init__()
+        self.choices = choices
+        self._default = default
+
+    def default(self) -> Any:
+        return self._default
+
+    def __repr__(self):
+        return f"Choice[{self.choices}  (default={self.default})]"

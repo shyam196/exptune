@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
 from exptune.exptune import ExperimentConfig, ExperimentSettings, Metric, TrialResources
-from exptune.hyperparams import LogUniformHyperParam
+from exptune.hyperparams import ChoiceHyperParam, LogUniformHyperParam
 from exptune.search_strategies import RandomSearchStrategy
 from exptune.summaries.final_run_summaries import (
     TestMetricSummaries,
@@ -29,10 +29,10 @@ def _trim_dataset_for_debug(dataset, prop=0.1):
 
 
 class MnistMlp(nn.Module):
-    def __init__(self):
+    def __init__(self, width):
         super().__init__()
-        self.fc1 = nn.Linear(784, 128)
-        self.fc2 = nn.Linear(128, 10)
+        self.fc1 = nn.Linear(784, width)
+        self.fc2 = nn.Linear(width, 10)
 
     def forward(self, x):
         x = torch.reshape(x, (-1, 784))
@@ -50,7 +50,7 @@ class Extra:
 class PytorchMnistMlpConfig(ExperimentConfig):
     def __init__(self, experiment_dir: Path = Path("~/pytorch_example/test")):
         super().__init__()
-        self.experiment_dir = experiment_dir
+        self.experiment_dir = experiment_dir.expanduser()
 
     def settings(self):
         return ExperimentSettings(
@@ -69,7 +69,8 @@ class PytorchMnistMlpConfig(ExperimentConfig):
     def hyperparams(self):
         return {
             "lr": LogUniformHyperParam(1e-4, 1e-1, default=0.01),
-            "wd": LogUniformHyperParam(1e-5, 1e-2, default=1e-4),
+            "layer_width": ChoiceHyperParam([64, 128, 256], default=128),
+            "batch_size": ChoiceHyperParam([16, 32, 64], default=32),
         }
 
     def search_strategy(self):
@@ -125,16 +126,18 @@ class PytorchMnistMlpConfig(ExperimentConfig):
             test_dataset = _trim_dataset_for_debug(train_dataset)
 
         return {
-            "train": DataLoader(train_split, batch_size=32, shuffle=True),
+            "train": DataLoader(
+                train_split, batch_size=int(hparams["batch_size"]), shuffle=True
+            ),
             "val": DataLoader(val_split, batch_size=512, shuffle=False),
             "test": DataLoader(test_dataset, batch_size=512, shuffle=False),
         }
 
     def model(self, hparams, debug_mode):
-        return MnistMlp()
+        return MnistMlp(hparams["layer_width"])
 
     def optimizer(self, model, hparams, debug_mode):
-        return Adam(model.parameters(), lr=hparams["lr"], weight_decay=hparams["wd"])
+        return Adam(model.parameters(), lr=hparams["lr"])
 
     def extra_setup(self, model, optimizer, hparams, debug_mode):
         return Extra(
