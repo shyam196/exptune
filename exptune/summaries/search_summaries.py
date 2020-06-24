@@ -10,9 +10,9 @@ from plotly.subplots import make_subplots
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern
 
-from exptune.exptune import Metric, SearchSummarizer
 from exptune.hyperparams import ChoiceHyperParam, HyperParam, LogUniformHyperParam
 from exptune.summaries.plotly_utils import write_figs
+from exptune.utils import Metric, SearchSummarizer
 
 _THEME = "plotly_white"
 

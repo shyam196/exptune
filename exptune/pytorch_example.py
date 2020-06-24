@@ -12,8 +12,12 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 
 from exptune.exptune import ExperimentConfig, ExperimentSettings, Metric, TrialResources
-from exptune.hyperparams import LogUniformHyperParam, UniformHyperParam
-from exptune.search_strategies import GridSearchStrategy
+from exptune.hyperparams import (
+    ChoiceHyperParam,
+    LogUniformHyperParam,
+    UniformHyperParam,
+)
+from exptune.search_strategies import BayesOptSearchStrategy
 from exptune.summaries.final_run_summaries import (
     TestMetricSummaries,
     TestQuantityScatterMatrix,
@@ -70,13 +74,17 @@ class PytorchMnistMlpConfig(ExperimentConfig):
 
     def hyperparams(self):
         return {
-            "lr": LogUniformHyperParam(1e-4, 1e-1, default=0.01),
-            "dropout": UniformHyperParam(0.0, 0.8, default=0.5),
+            "lr": LogUniformHyperParam(1e-4, 1e-2, default=0.01),
+            "dropout": UniformHyperParam(0.0, 1.0, default=0.5),
+            "batch_size": ChoiceHyperParam([16, 32, 64, 128], default=32),
         }
 
     def search_strategy(self):
         # return RandomSearchStrategy(num_samples=50)
-        return GridSearchStrategy({"lr": 4, "dropout": 4})
+        # return GridSearchStrategy({"lr": 4, "dropout": 4})
+        return BayesOptSearchStrategy(
+            num_samples=50, metric=self.trial_metric(), max_concurrent=6
+        )
 
     def search_summaries(self):
         return [
@@ -128,7 +136,9 @@ class PytorchMnistMlpConfig(ExperimentConfig):
             test_dataset = _trim_dataset_for_debug(train_dataset)
 
         return {
-            "train": DataLoader(train_split, batch_size=32, shuffle=True),
+            "train": DataLoader(
+                train_split, batch_size=hparams["batch_size"], shuffle=True
+            ),
             "val": DataLoader(val_split, batch_size=512, shuffle=False),
             "test": DataLoader(test_dataset, batch_size=512, shuffle=False),
         }

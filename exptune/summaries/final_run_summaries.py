@@ -5,8 +5,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-from exptune.exptune import FinalRunsSummarizer
 from exptune.summaries.plotly_utils import write_figs
+from exptune.utils import FinalRunsSummarizer
 
 _THEME = "plotly_white"
 
