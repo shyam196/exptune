@@ -23,7 +23,7 @@ def main(out_dir):
     print(check_config(conf, debug_mode=True, epochs=10))
 
     ray.init()
-    analysis = run_search(conf, experiment_dir / "search")
+    analysis = run_search(conf, experiment_dir / "search", debug_mode=True)
 
     hparams = get_best_hyperparams(analysis, conf.trial_metric())
     print("Best hyperparams: ", hparams)
