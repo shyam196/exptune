@@ -56,14 +56,14 @@ class Extra:
 class PytorchMnistMlpConfig(ExperimentConfig):
     def __init__(self, experiment_dir: Path = Path("~/pytorch_example/test")):
         super().__init__()
-        self.experiment_dir = experiment_dir.expanduser()
+        self.__experiment_dir = experiment_dir.expanduser()
 
     def settings(self):
         return ExperimentSettings(
             exp_name="MnistMlpExample",
             final_max_iterations=10,
             final_repeats=4,
-            exp_directory=self.experiment_dir,
+            exp_directory=self.__experiment_dir,
         )
 
     def configure_seeds(self, seed):
@@ -92,7 +92,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
                 self.hyperparams(),
                 self.trial_metric(),
                 [Metric("val_accuracy", "max")],
-                self.experiment_dir / "report.html",
+                self.settings().exp_directory / "report.html",
             )
         ]
 

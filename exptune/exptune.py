@@ -135,7 +135,6 @@ class ExperimentConfig(abc.ABC):
 
 class _ExperimentTrainable(tune.Trainable):
     def _setup(self, config: Dict[str, Any]):
-        print(config)
         self.exp_conf: ExperimentConfig = config[EXP_CONF_KEY]
         self.debug_mode: bool = config[DEBUG_MODE_KEY]
         self.hparams: Dict[str, Any] = config[HPARAMS_KEY]
@@ -201,7 +200,10 @@ class _ExperimentTrainable(tune.Trainable):
 
 
 def run_search(
-    experiment_config: ExperimentConfig, debug_mode=False
+    experiment_config: ExperimentConfig,
+    result_save_dir: Path,
+    debug_mode=False,
+    verbosity=1,
 ) -> tune.ExperimentAnalysis:
     settings: ExperimentSettings = experiment_config.settings()
     # Make the experiment directory
@@ -246,6 +248,8 @@ def run_search(
         reuse_actors=settings.reuse_actors,
         raise_on_failed_trial=settings.raise_on_failed_trial,
         ray_auto_init=False,
+        local_dir=str(result_save_dir.expanduser()),
+        verbose=verbosity,
     )
 
     search_df: pd.DataFrame = convert_experiment_analysis_to_df(analysis)
