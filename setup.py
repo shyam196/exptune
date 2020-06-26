@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import find_packages, setup
 
 with open("requirements.txt") as f:
     required = f.read().splitlines()
@@ -10,6 +10,6 @@ setup(
     author="Shyam A. Tailor",
     author_email="shyam.tailor@cs.ox.ac.uk",
     license="MIT",
-    packages=["exptune"],
+    packages=find_packages(),
     install_requires=required,
 )
