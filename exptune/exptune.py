@@ -204,7 +204,7 @@ def run_search(
     result_save_dir: Path,
     debug_mode=False,
     verbosity=1,
-) -> tune.ExperimentAnalysis:
+) -> Dict[str, Any]:
     settings: ExperimentSettings = experiment_config.settings()
     # Make the experiment directory
     if settings.exp_directory.exists():
@@ -254,19 +254,15 @@ def run_search(
 
     search_df: pd.DataFrame = convert_experiment_analysis_to_df(analysis)
     search_df.to_pickle(str(settings.exp_directory / "search_df.pickle"))
-    with open(settings.exp_directory / "exp_analysis.pickle", "wb") as f:
-        pickle.dump(analysis, f)
+    metric = experiment_config.trial_metric()
+    best_config: Dict[str, Any] = analysis.get_best_config(metric.name, metric.mode)
+    best_hparams: Dict[str, Any] = best_config[HPARAMS_KEY]
+
+    with open(settings.exp_directory / "best_hparams.pickle", "wb") as f:
+        pickle.dump(best_hparams, f)
 
     print("Summarizing search results")
     for summarizer in experiment_config.search_summaries():
         summarizer(search_df)
 
-    return analysis
-
-
-def get_best_hyperparams(
-    analysis: tune.ExperimentAnalysis, metric: Metric
-) -> Dict[str, Any]:
-    best_config: Dict[str, Any] = analysis.get_best_config(metric.name, metric.mode)
-    hparams: Dict[str, Any] = best_config[HPARAMS_KEY]
-    return hparams
+    return best_hparams

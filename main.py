@@ -3,7 +3,7 @@ from pathlib import Path
 import click
 import ray
 
-from exptune import check_config, get_best_hyperparams, run_search, train_final_models
+from exptune import check_config, run_search, train_final_models
 from exptune.pytorch_example import PytorchMnistMlpConfig
 
 
@@ -21,9 +21,7 @@ def main(out_dir):
     print(check_config(conf, debug_mode=True, epochs=10))
 
     ray.init()
-    analysis = run_search(conf, experiment_dir / "search", debug_mode=True)
-
-    hparams = get_best_hyperparams(analysis, conf.trial_metric())
+    hparams = run_search(conf, experiment_dir / "search", debug_mode=True)
     print("Best hyperparams: ", hparams)
 
     train_final_models(conf, hparams, experiment_dir / "train_final")
