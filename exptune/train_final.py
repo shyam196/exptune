@@ -53,12 +53,6 @@ def _train_model(
 
     try:
         print(results_dir)
-        if (
-            not check_gpu_availability()
-            and config.resource_requirements().requests_gpu()
-        ):
-            raise ValueError("GPU required for training this model")
-
         results_dir.mkdir(exist_ok=True)
         summary_writer: Optional[SummaryWriter] = None
         if use_tensorboard:
@@ -136,6 +130,10 @@ def train_final_models(
     print("Training final models")
     settings: ExperimentSettings = config.settings()
     resource_reqs: TrialResources = config.resource_requirements()
+
+    if not check_gpu_availability() and resource_reqs.requests_gpu():
+        raise ValueError("GPU required for training this model")
+
     pinned_objs: List[ray.ObjectID] = config.dataset_pin(debug_mode=False)
 
     if not out_dir.exists():
