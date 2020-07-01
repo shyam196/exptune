@@ -87,7 +87,7 @@ class FinalRunsSummarizer(abc.ABC):
 
 
 def check_gpu_availability() -> bool:
-    return len(GPUtil.getAvailable()) > 0
+    return len(GPUtil.getGPUs()) > 0
 
 
 TRIMMED_COLUMNS = ["timesteps_total", "episodes_total", "timesteps_since_restore"]
