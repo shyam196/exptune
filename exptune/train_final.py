@@ -95,11 +95,14 @@ def _train_model(
                 best_metric = v_metrics[metric_name]
                 config.persist_trial(results_dir, model, optimizer, hparams, extra)
 
-            combined_metrics: Dict[str, Any] = {**t_metrics, **v_metrics}
+            combined_metrics: Dict[str, Any] = {
+                "trial_id": trial_id,
+                "training_iteration": i,
+                **t_metrics,
+                **v_metrics,
+            }
             _log_to_tensorboard(summary_writer, combined_metrics, i)
-            results.append(
-                {"trial_id": trial_id, "training_iteration": i, **combined_metrics}
-            )
+            results.append(combined_metrics)
             stop: bool = stopper(trial_id, combined_metrics)
             if stop:
                 break
