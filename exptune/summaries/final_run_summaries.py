@@ -12,6 +12,8 @@ _THEME = "plotly_white"
 
 
 def _trial_curve(train_df: pd.DataFrame, quantity: str) -> go.Figure:
+    train_df.sort_values(by=["training_iteration", "trial_id"])
+
     mean = train_df.groupby("training_iteration").mean()
     std = train_df.groupby("training_iteration").std()
 
