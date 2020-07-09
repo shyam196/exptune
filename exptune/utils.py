@@ -1,6 +1,7 @@
 import abc
 from dataclasses import dataclass
 from datetime import datetime
+from operator import gt, lt
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -74,6 +75,38 @@ class ComposeStopper(tune.Stopper):
 
     def stop_all(self):
         return any([s.stop_all() for s in self.stoppers])
+
+
+class PatientStopper(tune.Stopper):
+    def __init__(self, metric, patience, mode, max_iters=200, *args, **kwargs):
+        if mode not in ["min", "max"]:
+            raise ValueError("Invalid specification of mode, should be min or max")
+        self.patience = patience
+        self.metric = metric
+        self.cmp = lt if mode == "min" else gt
+        self.history = dict()
+        self.max_iters = max_iters
+
+    def __call__(self, trial_id, result):
+        current_iteration = result["training_iteration"]
+        current_metric = result[self.metric]
+        if trial_id not in self.history:
+            self.history[trial_id] = (current_iteration, current_metric)
+            result[f"best_{self.metric}"] = current_metric
+            return False
+        else:
+            best_iter, best_metric = self.history[trial_id]
+            result[f"best_{self.metric}"] = best_metric
+            if current_iteration > self.max_iters:
+                return True
+            if self.cmp(current_metric, best_metric):
+                self.history[trial_id] = (current_iteration, current_metric)
+                return False
+            else:
+                return (current_iteration - best_iter) > self.patience
+
+    def stop_all(self):
+        return False
 
 
 class SearchSummarizer(abc.ABC):
