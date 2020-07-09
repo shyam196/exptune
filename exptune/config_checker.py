@@ -1,4 +1,7 @@
+import shutil
+import tempfile
 from collections import defaultdict
+from pathlib import Path
 from typing import Any, DefaultDict, Dict, List, Tuple
 
 import pandas as pd
@@ -31,7 +34,7 @@ def _add_to_collected_results(
 
 
 def check_config(
-    config: ExperimentConfig, debug_mode: bool, epochs=10
+    config: ExperimentConfig, debug_mode: bool, epochs=10, check_persistence=True
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
 
     console: Console = Console(width=120)
@@ -70,5 +73,16 @@ def check_config(
     test_metrics, test_extra = config.test(model, data, extra, debug_mode)
     console.log(test_metrics)
     console.log(test_extra)
+
+    if check_persistence:
+        console.log("\n\nTesting persistence")
+        tmp_dir = Path(tempfile.mkdtemp())
+        console.log(f"Saving to {tmp_dir}...")
+        config.persist_trial(tmp_dir, model, optimizer, hparams, extra)
+        console.log("Restoring...")
+        config.restore_trial(tmp_dir)
+
+        console.log("Deleting temporary directory...")
+        shutil.rmtree(tmp_dir)
 
     return pd.DataFrame(complete_metrics), test_metrics

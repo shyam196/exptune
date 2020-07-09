@@ -3,9 +3,9 @@ from os import environ
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from ray.tune.schedulers import AsyncHyperBandScheduler
+from torch import nn as nn
+from torch.nn import functional as F
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader, Subset

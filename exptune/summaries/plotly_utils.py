@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List
 
-import plotly.graph_objects as go
+from plotly import graph_objects as go
 
 
 def write_figs(figs: List[go.Figure], out_path: Path) -> None:

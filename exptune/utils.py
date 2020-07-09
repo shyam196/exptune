@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 
 import GPUtil
 import pandas as pd
-import ray.tune as tune
+from ray import tune as tune
 from ray.tune import ExperimentAnalysis
 
 EXP_CONF_KEY = "exp_conf_obj"

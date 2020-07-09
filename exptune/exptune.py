@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
-import ray.tune as tune
 from ray import ObjectID
+from ray import tune as tune
 from ray.tune import ExperimentAnalysis
 from ray.tune.schedulers import TrialScheduler
 

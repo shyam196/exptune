@@ -4,8 +4,8 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
+from plotly import express as px
+from plotly import graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern
