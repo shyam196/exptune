@@ -58,16 +58,19 @@ def check_config(
     console.log("Starting training loop")
     complete_metrics: DefaultDict[str, List[Any]] = defaultdict(list)
 
-    for i in range(1, epochs + 1):
-        console.log(f"\n\nEpoch {i}")
-        t_metrics, t_extra = config.train(model, optimizer, data, extra, debug_mode)
-        console.log(t_metrics, t_extra)
-        v_metrics, v_extra = config.val(model, data, extra, debug_mode)
-        console.log(v_metrics, v_extra)
+    try:
+        for i in range(1, epochs + 1):
+            console.log(f"\n\nEpoch {i}")
+            t_metrics, t_extra = config.train(model, optimizer, data, extra, debug_mode)
+            console.log(t_metrics, t_extra)
+            v_metrics, v_extra = config.val(model, data, extra, debug_mode)
+            console.log(v_metrics, v_extra)
 
-        _add_to_collected_results(
-            complete_metrics, {"epoch": i, **t_metrics, **v_metrics}
-        )
+            _add_to_collected_results(
+                complete_metrics, {"epoch": i, **t_metrics, **v_metrics}
+            )
+    except KeyboardInterrupt:
+        console.log("Interrupting training...")
 
     console.log("\n\nTraining finished; testing...")
     test_metrics, test_extra = config.test(model, data, extra, debug_mode)
