@@ -3,6 +3,7 @@ import pickle
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+import numpy as np
 import pandas as pd
 from ray import ObjectID
 from ray import tune as tune
@@ -198,6 +199,7 @@ def run_search(
     result_save_dir: Path,
     debug_mode=False,
     verbosity=1,
+    np_seed=None,
 ) -> Dict[str, Any]:
     settings: ExperimentSettings = experiment_config.settings()
     # Make the experiment directory
@@ -218,6 +220,8 @@ def run_search(
     }
 
     # Set up hyperparameters
+    if np_seed is not None:
+        np.random.seed(np_seed)
     hparams = experiment_config.hyperparams()
     for k, v in experiment_config.fixed_hyperparams().items():
         hparams[k] = v
