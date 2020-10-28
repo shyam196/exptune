@@ -17,7 +17,7 @@ from exptune.hyperparams import (
     LogUniformHyperParam,
     UniformHyperParam,
 )
-from exptune.search_strategies import BayesOptSearchStrategy
+from exptune.search_strategies import RandomSearchStrategy
 from exptune.summaries.final_run_summaries import (
     TestMetricSummaries,
     TestQuantityScatterMatrix,
@@ -80,11 +80,11 @@ class PytorchMnistMlpConfig(ExperimentConfig):
         }
 
     def search_strategy(self):
-        # return RandomSearchStrategy(num_samples=50)
+        return RandomSearchStrategy(num_samples=5)
         # return GridSearchStrategy({"lr": 4, "dropout": 4})
-        return BayesOptSearchStrategy(
-            num_samples=50, metric=self.trial_metric(), max_concurrent=6
-        )
+        # return BayesOptSearchStrategy(
+        # num_samples=50, metric=self.trial_metric(), max_concurrent=6
+        # )
 
     def search_summaries(self):
         return [
@@ -197,6 +197,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
 
     def train(self, model, optimizer, data, extra, debug_mode):
         device = extra.device
+        model.to(device)
 
         model.train()
         total_loss = 0.0
@@ -224,6 +225,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
 
     def __eval(self, split, model, data, extra, debug_mode):
         device = extra.device
+        model.to(device)
 
         model.eval()
         eval_loss = 0

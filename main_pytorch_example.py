@@ -18,7 +18,7 @@ def main(out_dir):
     conf: PytorchMnistMlpConfig = PytorchMnistMlpConfig(experiment_dir)
 
     # Check the config runs as expected
-    print(check_config(conf, debug_mode=True, epochs=10))
+    print(check_config(conf, debug_mode=True, epochs=10), "\n\n\n")
 
     ray.init()
     hparams = run_search(conf, experiment_dir / "search", debug_mode=True)
