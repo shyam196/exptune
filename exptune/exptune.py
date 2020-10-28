@@ -99,12 +99,6 @@ class ExperimentConfig(abc.ABC):
     ) -> Tuple[Any, Any, Dict[str, Any], Any]:
         raise NotImplementedError
 
-    def trial_update_hparams(
-        self, model: Any, optimizer: Any, extra: Any, new_hparams: Dict[str, Any]
-    ) -> bool:
-        # used by PBT
-        return False
-
     @abc.abstractmethod
     def train(
         self, model: Any, optimizer: Any, data: Any, extra: Any, debug_mode: bool
@@ -134,7 +128,7 @@ class ExperimentConfig(abc.ABC):
 
 
 class _ExperimentTrainable(tune.Trainable):
-    def _setup(self, config: Dict[str, Any]):
+    def setup(self, config: Dict[str, Any]):
         self.exp_conf: ExperimentConfig = config[EXP_CONF_KEY]
         self.debug_mode: bool = config[DEBUG_MODE_KEY]
         self.hparams: Dict[str, Any] = config[HPARAMS_KEY]
@@ -166,7 +160,7 @@ class _ExperimentTrainable(tune.Trainable):
         with open(Path("extra_info") / f"{name}_{self.iteration}.pkl", "wb") as f:
             pickle.dump(data, f)
 
-    def _train(self):
+    def step(self):
         t_metrics: Dict[str, Any]
         t_extra: Any
         t_metrics, t_extra = self.exp_conf.train(
@@ -184,13 +178,13 @@ class _ExperimentTrainable(tune.Trainable):
 
         return {**t_metrics, **v_metrics}
 
-    def _save(self, checkpoint_dir):
+    def save_checkpoint(self, checkpoint_dir):
         self.exp_conf.persist_trial(
             Path(checkpoint_dir), self.model, self.optimizer, self.hparams, self.extra
         )
         return checkpoint_dir
 
-    def _restore(self, checkpoint_dir):
+    def load_checkpoint(self, checkpoint_dir):
         (
             self.model,
             self.optimizer,
@@ -252,10 +246,15 @@ def run_search(
         verbose=verbosity,
     )
 
+    metric = experiment_config.trial_metric()
+    analysis.default_metric = metric.name
+    analysis.default_mode = metric.mode
+
+    # used for the search summaries
     search_df: pd.DataFrame = convert_experiment_analysis_to_df(analysis)
     search_df.to_pickle(str(settings.exp_directory / "search_df.pickle"))
-    metric = experiment_config.trial_metric()
-    best_config: Dict[str, Any] = analysis.get_best_config(metric.name, metric.mode)
+
+    best_config: Dict[str, Any] = analysis.get_best_trial(scope="all").config
     best_hparams: Dict[str, Any] = best_config[HPARAMS_KEY]
 
     with open(settings.exp_directory / "best_hparams.pickle", "wb") as f:
