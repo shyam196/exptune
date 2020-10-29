@@ -16,7 +16,13 @@ from .exptune import (
     Metric,
     TrialResources,
 )
-from .utils import check_gpu_availability
+from .utils import (
+    FINAL_RUNS_DIR,
+    FINAL_RUNS_SUMMARY_DIR,
+    TEST_DF_FILE,
+    TRAIN_DF_FILE,
+    check_gpu_availability,
+)
 
 
 def _log_to_tensorboard(
@@ -124,7 +130,7 @@ def _train_model(
 def train_final_models(
     config: ExperimentConfig,
     hparams: Dict[str, Any],
-    out_dir: Path,
+    exp_directory: Path,
     use_tensorboard=True,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     print("Training final models")
@@ -136,6 +142,7 @@ def train_final_models(
 
     pinned_objs: List[ray.ObjectID] = config.dataset_pin(debug_mode=False)
 
+    out_dir = exp_directory / FINAL_RUNS_DIR
     if not out_dir.exists():
         out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -163,11 +170,13 @@ def train_final_models(
     test_df: pd.DataFrame = pd.concat([r[1] for r in results_without_fails])
 
     print("Saving results")
-    train_df.to_pickle(str(out_dir / "train_dataframe.pickle"))
-    test_df.to_pickle(str(out_dir / "test_dataframe.pickle"))
+    train_df.to_pickle(str(exp_directory.expanduser() / TRAIN_DF_FILE))
+    test_df.to_pickle(str(exp_directory.expanduser() / TEST_DF_FILE))
 
-    print("Summarizing results")
+    summary_dir = exp_directory.expanduser() / FINAL_RUNS_SUMMARY_DIR
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    print("Summarizing results to", summary_dir)
     for summarizer in config.final_runs_summaries():
-        summarizer(train_df, test_df)
+        summarizer(summary_dir, train_df, test_df)
 
     return train_df, test_df

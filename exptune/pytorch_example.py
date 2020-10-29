@@ -54,16 +54,9 @@ class Extra:
 
 
 class PytorchMnistMlpConfig(ExperimentConfig):
-    def __init__(self, experiment_dir: Path = Path("~/pytorch_example/test")):
-        super().__init__()
-        self.__experiment_dir = experiment_dir.expanduser()
-
     def settings(self):
         return ExperimentSettings(
-            exp_name="MnistMlpExample",
-            final_max_iterations=10,
-            final_repeats=4,
-            exp_directory=self.__experiment_dir,
+            exp_name="MnistMlpExample", final_max_iterations=10, final_repeats=4,
         )
 
     def configure_seeds(self, seed):
@@ -92,7 +85,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
                 self.hyperparams(),
                 self.trial_metric(),
                 [Metric("val_accuracy", "max")],
-                self.settings().exp_directory / "report.html",
+                "report",
             )
         ]
 
@@ -257,7 +250,6 @@ class PytorchMnistMlpConfig(ExperimentConfig):
         return self.__eval("test", model, data, extra, debug_mode)
 
     def final_runs_summaries(self):
-        path = self.settings().exp_directory / "final_runs_summaries"
         return [
             TestMetricSummaries(),
             TrainingQuantityScatterMatrix(
@@ -268,11 +260,9 @@ class PytorchMnistMlpConfig(ExperimentConfig):
                     "val_accuracy",
                     "training_iteration",
                 ],
-                path / "train_scatter.html",
+                "train_scatter",
             ),
-            TestQuantityScatterMatrix(
-                ["test_loss", "test_accuracy"], path / "test_scatter.html"
-            ),
-            TrialCurvePlotter(["val_loss", "train_loss"], path / "curves.html"),
-            ViolinPlotter(["test_loss", "test_accuracy"], path / "violins.html"),
+            TestQuantityScatterMatrix(["test_loss", "test_accuracy"], "test_scatter",),
+            TrialCurvePlotter(["val_loss", "train_loss"], "loss_curves"),
+            ViolinPlotter(["test_loss", "test_accuracy"], "violins"),
         ]

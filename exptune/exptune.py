@@ -13,10 +13,14 @@ from ray.tune.schedulers import TrialScheduler
 from exptune.hyperparams import HyperParam
 from exptune.search_strategies import SearchStrategy
 from exptune.utils import (
+    BEST_HYPERPARAMS_FILE,
     DEBUG_MODE_KEY,
     EXP_CONF_KEY,
     HPARAMS_KEY,
     PINNED_OID_KEY,
+    SEARCH_DF_FILE,
+    SEARCH_DIR,
+    SEARCH_SUMMARY_DIR,
     ComposeStopper,
     ExperimentSettings,
     FinalRunsSummarizer,
@@ -196,20 +200,18 @@ class _ExperimentTrainable(tune.Trainable):
 
 def run_search(
     experiment_config: ExperimentConfig,
-    result_save_dir: Path,
+    exp_directory: Path,
     debug_mode=False,
     verbosity=1,
     np_seed=None,
 ) -> Dict[str, Any]:
     settings: ExperimentSettings = experiment_config.settings()
     # Make the experiment directory
-    if settings.exp_directory.exists():
-        print(
-            f"Experiment directory ({settings.exp_directory}) already exists; continuing..."
-        )
+    if exp_directory.exists():
+        print(f"Experiment directory ({exp_directory}) already exists; continuing...")
     else:
-        print(f"Creating experiment directory ({settings.exp_directory})")
-        settings.exp_directory.mkdir(parents=True)
+        print(f"Creating experiment directory ({exp_directory})")
+        exp_directory.mkdir(parents=True)
 
     search_strategy: SearchStrategy = experiment_config.search_strategy()
 
@@ -246,7 +248,7 @@ def run_search(
         reuse_actors=settings.reuse_actors,
         raise_on_failed_trial=settings.raise_on_failed_trial,
         ray_auto_init=False,
-        local_dir=str(result_save_dir.expanduser()),
+        local_dir=str(exp_directory.expanduser() / SEARCH_DIR),
         verbose=verbosity,
     )
 
@@ -256,16 +258,18 @@ def run_search(
 
     # used for the search summaries
     search_df: pd.DataFrame = convert_experiment_analysis_to_df(analysis)
-    search_df.to_pickle(str(settings.exp_directory / "search_df.pickle"))
+    search_df.to_pickle(str(exp_directory / SEARCH_DF_FILE))
 
     best_config: Dict[str, Any] = analysis.get_best_trial(scope="all").config
     best_hparams: Dict[str, Any] = best_config[HPARAMS_KEY]
 
-    with open(settings.exp_directory / "best_hparams.pickle", "wb") as f:
+    with open(exp_directory / BEST_HYPERPARAMS_FILE, "wb") as f:
         pickle.dump(best_hparams, f)
 
-    print("Summarizing search results")
+    summary_dir = exp_directory / SEARCH_SUMMARY_DIR
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    print("Summarizing search results to: ", summary_dir)
     for summarizer in experiment_config.search_summaries():
-        summarizer(search_df)
+        summarizer(summary_dir, search_df)
 
     return best_hparams

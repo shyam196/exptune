@@ -16,10 +16,19 @@ PINNED_OID_KEY = "pinned_obj_ids"
 DEBUG_MODE_KEY = "debug_mode"
 
 
+SEARCH_DIR = "ray_search"
+SEARCH_SUMMARY_DIR = "search_summaries"
+FINAL_RUNS_DIR = "final_runs"
+FINAL_RUNS_SUMMARY_DIR = "final_run_summaries"
+SEARCH_DF_FILE = "search_df.pickle"
+BEST_HYPERPARAMS_FILE = "best_hparams.pickle"
+TRAIN_DF_FILE = "final_train_df.pickle"
+TEST_DF_FILE = "final_test_df.pickle"
+
+
 @dataclass
 class ExperimentSettings:
     exp_name: str
-    exp_directory: Path
     timestamp_experiment_name: bool = True
     checkpoint_freq: int = 0
     checkpoint_at_end: bool = True
@@ -30,9 +39,6 @@ class ExperimentSettings:
     final_max_iterations: int = 100
     final_repeats: int = 5
     final_run_timeout: Optional[float] = None
-
-    def __post_init__(self):
-        self.exp_directory = self.exp_directory.expanduser()
 
     @property
     def name(self):
@@ -110,12 +116,14 @@ class PatientStopper(tune.Stopper):
 
 
 class SearchSummarizer(abc.ABC):
-    def __call__(self, search_df: pd.DataFrame) -> None:
+    def __call__(self, path: Path, search_df: pd.DataFrame) -> None:
         raise NotImplementedError
 
 
 class FinalRunsSummarizer(abc.ABC):
-    def __call__(self, training_df: pd.DataFrame, test_df: pd.DataFrame) -> None:
+    def __call__(
+        self, path: Path, training_df: pd.DataFrame, test_df: pd.DataFrame
+    ) -> None:
         raise NotImplementedError
 
 

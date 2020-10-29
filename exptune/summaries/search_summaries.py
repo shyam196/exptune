@@ -1,5 +1,4 @@
 import itertools
-from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
@@ -300,15 +299,15 @@ class HyperParamReport(SearchSummarizer):
         hyperparameters: Dict[str, HyperParam],
         primary_metric: Metric,
         aux_metrics: List[Metric],
-        out_path: Path,
+        name: str,
     ):
         super().__init__()
         self.hyperparameters = hyperparameters
         self.primary_metric = primary_metric
         self.aux_metrics = aux_metrics
-        self.out_path = out_path
+        self.name = name
 
-    def __call__(self, search_df: pd.DataFrame) -> None:
+    def __call__(self, path, search_df: pd.DataFrame) -> None:
         figs: List[go.Figure] = []
 
         figs.append(
@@ -342,4 +341,4 @@ class HyperParamReport(SearchSummarizer):
                 continue
             figs.append(_single_hparam_plot(search_df, self.primary_metric, hparam))
 
-        write_figs(figs, self.out_path)
+        write_figs(figs, path.expanduser() / f"{self.name}.html")

@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import List
 
 import pandas as pd
@@ -79,52 +78,52 @@ def _violin(df: pd.DataFrame, quantity: str) -> go.Figure:
 
 
 class TrialCurvePlotter(FinalRunsSummarizer):
-    def __init__(self, quantities: List[str], out_path: Path):
+    def __init__(self, quantities: List[str], name: str):
         super().__init__()
         self.quantities: List[str] = quantities
-        self.out_path: Path = out_path.expanduser()
+        self.name = name
 
-    def __call__(self, training_df, test_df):
+    def __call__(self, path, training_df, test_df):
         figs: List[go.Figure] = []
         for quant in self.quantities:
             figs.append(_trial_curve(training_df, quant))
 
-        write_figs(figs, self.out_path)
+        write_figs(figs, path.expanduser() / f"{self.name}.html")
 
 
 class TrainingQuantityScatterMatrix(FinalRunsSummarizer):
-    def __init__(self, quantities: List[str], out_path: Path):
+    def __init__(self, quantities: List[str], name: str):
         super().__init__()
         self.quantities: List[str] = quantities
-        self.out_path: Path = out_path.expanduser()
+        self.name = name
 
-    def __call__(self, training_df, test_df):
+    def __call__(self, path, training_df, test_df):
         write_figs(
             [_quantity_matrix(training_df, self.quantities, color_by_iteration=True)],
-            self.out_path,
+            path.expanduser() / f"{self.name}.html",
         )
 
 
 class TestQuantityScatterMatrix(FinalRunsSummarizer):
-    def __init__(self, quantities: List[str], out_path: Path):
+    def __init__(self, quantities: List[str], name: str):
         super().__init__()
         self.quantities: List[str] = quantities
-        self.out_path: Path = out_path.expanduser()
+        self.name = name
 
-    def __call__(self, training_df, test_df):
+    def __call__(self, path, training_df, test_df):
         write_figs(
             [_quantity_matrix(test_df, self.quantities, color_by_iteration=False)],
-            self.out_path,
+            path.expanduser() / f"{self.name}.html",
         )
 
 
 class ViolinPlotter(FinalRunsSummarizer):
-    def __init__(self, quantities: List[str], out_path: Path):
+    def __init__(self, quantities: List[str], name: str):
         super().__init__()
         self.quantities: List[str] = quantities
-        self.out_path: Path = out_path.expanduser()
+        self.name = name
 
-    def __call__(self, training_df, test_df):
+    def __call__(self, path, training_df, test_df):
         figs: List[go.Figure] = []
 
         for quant in self.quantities:
@@ -135,9 +134,9 @@ class ViolinPlotter(FinalRunsSummarizer):
             if quant in test_df.columns:
                 figs.append(_violin(test_df, quant))
 
-        write_figs(figs, self.out_path)
+        write_figs(figs, path.expanduser() / f"{self.name}.html")
 
 
 class TestMetricSummaries(FinalRunsSummarizer):
-    def __call__(self, training_df, test_df):
+    def __call__(self, path, training_df, test_df):
         print(test_df.describe())
