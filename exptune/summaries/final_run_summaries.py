@@ -42,7 +42,7 @@ class TrialCurvePlotter(FinalRunsSummarizer):
         self.name = name
 
     def __call__(self, path, training_df, test_df):
-        out_dir = path / "trial_curves"
+        out_dir = path / self.name
         out_dir.mkdir()
         for quant in self.quantities:
             _trial_curve(training_df, quant, out_dir / f"{quant}.png")
@@ -55,7 +55,7 @@ class TrainingQuantityScatterMatrix(FinalRunsSummarizer):
         self.name = name
 
     def __call__(self, path, training_df, test_df):
-        out_dir = path / "training_scatters"
+        out_dir = path / self.name
         out_dir.mkdir()
 
         for x, y in itertools.combinations(self.quantities, r=2):
@@ -69,7 +69,7 @@ class TestQuantityScatterMatrix(FinalRunsSummarizer):
         self.name = name
 
     def __call__(self, path, training_df, test_df):
-        out_dir = path / "test_scatters"
+        out_dir = path / self.name
         out_dir.mkdir()
 
         for x, y in itertools.combinations(self.quantities, r=2):
@@ -85,7 +85,7 @@ class ViolinPlotter(FinalRunsSummarizer):
         self.name = name
 
     def __call__(self, path, training_df, test_df):
-        out_dir = path / "violins"
+        out_dir = path / self.name
         out_dir.mkdir()
 
         for quant in self.quantities:
