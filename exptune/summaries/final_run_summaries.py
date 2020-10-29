@@ -1,80 +1,38 @@
+import itertools
+from pathlib import Path
 from typing import List
 
+import matplotlib.pyplot as plt
 import pandas as pd
-from plotly import express as px
-from plotly import graph_objects as go
+import seaborn as sns
 
-from exptune.summaries.plotly_utils import write_figs
 from exptune.utils import FinalRunsSummarizer
 
-_THEME = "plotly_white"
 
-
-def _trial_curve(train_df: pd.DataFrame, quantity: str) -> go.Figure:
-    train_df.sort_values(by=["training_iteration", "trial_id"])
-
-    mean = train_df.groupby("training_iteration").mean()
-    std = train_df.groupby("training_iteration").std()
-
-    m = mean[quantity]
-    s = std[quantity]
-
-    upper = go.Scatter(
-        x=train_df["training_iteration"],
-        y=m + s,
-        name="Upper (std)",
-        mode="lines",
-        marker=dict(color="#444"),
-        line=dict(width=0),
-        fillcolor="rgba(255, 68, 68, 0.15)",
-        fill="tonexty",
-    )
-    mean = go.Scatter(
-        x=train_df["training_iteration"],
-        y=m,
-        name="Mean",
-        mode="lines",
-        line=dict(color="rgb(255, 10, 10)"),
-        fillcolor="rgba(255, 68, 68, 0.15)",
-        fill="tonexty",
-    )
-    lower = go.Scatter(
-        x=train_df["training_iteration"],
-        y=m - s,
-        name="Lower (std)",
-        marker=dict(color="#444"),
-        line=dict(width=0),
-        mode="lines",
-    )
-
-    fig = go.Figure(data=[lower, mean, upper])
-    fig.update_layout(
-        xaxis_title="training_iteration", yaxis_title=quantity,
-    )
-
-    fig.layout.template = _THEME
-
-    return fig
+def _trial_curve(train_df: pd.DataFrame, quantity: str, path: Path) -> None:
+    plt.clf()
+    sns.lineplot(x="training_iteration", y=quantity, data=train_df)
+    plt.tight_layout()
+    plt.savefig(str(path))
 
 
 def _quantity_matrix(
-    df: pd.DataFrame, quantities: List[str], color_by_iteration: bool = True
-) -> go.Figure:
-    fig = px.scatter_matrix(
-        df,
-        dimensions=quantities,
-        color="training_iteration" if color_by_iteration else None,
-        hover_data=df.columns,
+    df: pd.DataFrame, quantities: List[str], path: Path, color_by_iteration: bool = True
+) -> None:
+    plt.clf()
+    x, y = quantities[0], quantities[1]
+    sns.scatterplot(
+        x=x, y=y, hue="training_iteration" if color_by_iteration else None, data=df,
     )
+    plt.tight_layout()
+    plt.savefig(str(path))
 
-    fig.layout.template = _THEME
-    return fig
 
-
-def _violin(df: pd.DataFrame, quantity: str) -> go.Figure:
-    fig = px.violin(df, x=quantity, box=True, points="all", hover_data=df.columns)
-    fig.layout.template = _THEME
-    return fig
+def _violin(df: pd.DataFrame, quantity: str, path: Path) -> None:
+    plt.clf()
+    sns.violinplot(x=quantity, data=df)
+    plt.tight_layout()
+    plt.savefig(str(path))
 
 
 class TrialCurvePlotter(FinalRunsSummarizer):
@@ -84,11 +42,10 @@ class TrialCurvePlotter(FinalRunsSummarizer):
         self.name = name
 
     def __call__(self, path, training_df, test_df):
-        figs: List[go.Figure] = []
+        out_dir = path / "trial_curves"
+        out_dir.mkdir()
         for quant in self.quantities:
-            figs.append(_trial_curve(training_df, quant))
-
-        write_figs(figs, path.expanduser() / f"{self.name}.html")
+            _trial_curve(training_df, quant, out_dir / f"{quant}.png")
 
 
 class TrainingQuantityScatterMatrix(FinalRunsSummarizer):
@@ -98,10 +55,11 @@ class TrainingQuantityScatterMatrix(FinalRunsSummarizer):
         self.name = name
 
     def __call__(self, path, training_df, test_df):
-        write_figs(
-            [_quantity_matrix(training_df, self.quantities, color_by_iteration=True)],
-            path.expanduser() / f"{self.name}.html",
-        )
+        out_dir = path / "training_scatters"
+        out_dir.mkdir()
+
+        for x, y in itertools.combinations(self.quantities, r=2):
+            _quantity_matrix(training_df, [x, y], out_dir / f"{x}_{y}.png")
 
 
 class TestQuantityScatterMatrix(FinalRunsSummarizer):
@@ -111,10 +69,13 @@ class TestQuantityScatterMatrix(FinalRunsSummarizer):
         self.name = name
 
     def __call__(self, path, training_df, test_df):
-        write_figs(
-            [_quantity_matrix(test_df, self.quantities, color_by_iteration=False)],
-            path.expanduser() / f"{self.name}.html",
-        )
+        out_dir = path / "test_scatters"
+        out_dir.mkdir()
+
+        for x, y in itertools.combinations(self.quantities, r=2):
+            _quantity_matrix(
+                test_df, [x, y], out_dir / f"{x}_{y}.png", color_by_iteration=False
+            )
 
 
 class ViolinPlotter(FinalRunsSummarizer):
@@ -124,17 +85,16 @@ class ViolinPlotter(FinalRunsSummarizer):
         self.name = name
 
     def __call__(self, path, training_df, test_df):
-        figs: List[go.Figure] = []
+        out_dir = path / "violins"
+        out_dir.mkdir()
 
         for quant in self.quantities:
             if quant in training_df.columns:
-                figs.append(_violin(training_df, quant))
+                _violin(training_df, quant, out_dir / f"{quant}.png")
 
         for quant in self.quantities:
             if quant in test_df.columns:
-                figs.append(_violin(test_df, quant))
-
-        write_figs(figs, path.expanduser() / f"{self.name}.html")
+                _violin(test_df, quant, out_dir / f"{quant}.png")
 
 
 class TestMetricSummaries(FinalRunsSummarizer):
