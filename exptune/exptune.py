@@ -266,10 +266,14 @@ def run_search(
     with open(exp_directory / BEST_HYPERPARAMS_FILE, "wb") as f:
         pickle.dump(best_hparams, f)
 
+    print(search_df.to_string())
     summary_dir = exp_directory / SEARCH_SUMMARY_DIR
     summary_dir.mkdir(parents=True, exist_ok=True)
     print("Summarizing search results to: ", summary_dir)
     for summarizer in experiment_config.search_summaries():
-        summarizer(summary_dir, search_df)
+        try:
+            summarizer(summary_dir, search_df)
+        except Exception:
+            print("Failed summariser:", summarizer)
 
     return best_hparams

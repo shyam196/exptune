@@ -177,6 +177,9 @@ def train_final_models(
     summary_dir.mkdir(parents=True, exist_ok=True)
     print("Summarizing results to", summary_dir)
     for summarizer in config.final_runs_summaries():
-        summarizer(summary_dir, train_df, test_df)
+        try:
+            summarizer(summary_dir, train_df, test_df)
+        except Exception:
+            print("Failed summariser", summarizer)
 
     return train_df, test_df
