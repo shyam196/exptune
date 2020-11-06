@@ -55,6 +55,7 @@ def _train_model(
     results_dir: Path,
     pinned_objs: List[ray.ObjectID],
     use_tensorboard: bool,
+    print_each_epoch: bool,
 ) -> Optional[Tuple[pd.DataFrame, pd.DataFrame]]:
 
     try:
@@ -103,6 +104,9 @@ def _train_model(
             }
             _log_to_tensorboard(summary_writer, combined_metrics, i)
             results.append(combined_metrics)
+            if print_each_epoch:
+                pprint(combined_metrics)
+
             stop: bool = stopper(trial_id, combined_metrics)
             if stop:
                 break
@@ -133,6 +137,7 @@ def train_final_models(
     exp_directory: Path,
     use_tensorboard=True,
     override_repeats=None,
+    print_per_epoch=True,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     print("Training final models")
     settings: ExperimentSettings = config.settings()
@@ -159,7 +164,15 @@ def train_final_models(
                 num_cpus=resource_reqs.cpus,
                 num_gpus=resource_reqs.gpus,
                 max_retries=settings.max_retries,
-            ).remote(config, i, hparams, trial_dir, pinned_objs, use_tensorboard)
+            ).remote(
+                config,
+                i,
+                hparams,
+                trial_dir,
+                pinned_objs,
+                use_tensorboard,
+                print_per_epoch,
+            )
         )
 
     print("Waiting for runs...")
