@@ -21,6 +21,8 @@ def _quantity_matrix(
 ) -> None:
     plt.clf()
     x, y = quantities[0], quantities[1]
+    if y == "training_iteration":
+        x, y = y, x
     sns.scatterplot(
         x=x, y=y, hue="training_iteration" if color_by_iteration else None, data=df,
     )
