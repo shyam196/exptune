@@ -132,6 +132,7 @@ def train_final_models(
     hparams: Dict[str, Any],
     exp_directory: Path,
     use_tensorboard=True,
+    override_repeats=None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     print("Training final models")
     settings: ExperimentSettings = config.settings()
@@ -146,8 +147,12 @@ def train_final_models(
     if not out_dir.exists():
         out_dir.mkdir(parents=True, exist_ok=True)
 
+    repeats = settings.final_repeats + 1
+    if override_repeats is not None:
+        repeats = override_repeats + 1
+
     runs: List[ray.TaskID] = []
-    for i in range(1, settings.final_repeats + 1):
+    for i in range(1, repeats):
         trial_dir: Path = out_dir / f"run_{i}"
         runs.append(
             _train_model.options(
