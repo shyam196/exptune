@@ -34,7 +34,7 @@ def _add_to_collected_results(
 
 
 def check_config(
-    config: ExperimentConfig, debug_mode: bool, epochs=10, check_persistence=True
+    config: ExperimentConfig, epochs=10, check_persistence=True
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
 
     console: Console = Console(width=120)
@@ -45,10 +45,10 @@ def check_config(
 
     hparams: Dict[str, Any] = _get_default_hparams(config)
     console.log("Hyperparameters:\n", hparams)
-    data: Any = config.data([], hparams, debug_mode)
-    model: Any = config.model(hparams, debug_mode)
-    optimizer: Any = config.optimizer(model, hparams, debug_mode)
-    extra: Any = config.extra_setup(model, optimizer, hparams, debug_mode)
+    data: Any = config.data([], hparams)
+    model: Any = config.model(hparams)
+    optimizer: Any = config.optimizer(model, hparams)
+    extra: Any = config.extra_setup(model, optimizer, hparams)
 
     console.log("Data:\n", data)
     console.log("Model:\n", model)
@@ -61,9 +61,9 @@ def check_config(
     try:
         for i in range(1, epochs + 1):
             console.log(f"\n\nEpoch {i}")
-            t_metrics, t_extra = config.train(model, optimizer, data, extra, debug_mode)
+            t_metrics, t_extra = config.train(model, optimizer, data, extra)
             console.log(t_metrics, t_extra)
-            v_metrics, v_extra = config.val(model, data, extra, debug_mode)
+            v_metrics, v_extra = config.val(model, data, extra)
             console.log(v_metrics, v_extra)
 
             _add_to_collected_results(
@@ -73,7 +73,7 @@ def check_config(
         console.log("Interrupting training...")
 
     console.log("\n\nTraining finished; testing...")
-    test_metrics, test_extra = config.test(model, data, extra, debug_mode)
+    test_metrics, test_extra = config.test(model, data, extra)
     console.log(test_metrics)
     console.log(test_extra)
 

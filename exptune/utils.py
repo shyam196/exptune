@@ -13,7 +13,6 @@ from ray.tune import ExperimentAnalysis
 EXP_CONF_KEY = "exp_conf_obj"
 HPARAMS_KEY = "hparams"
 PINNED_OID_KEY = "pinned_obj_ids"
-DEBUG_MODE_KEY = "debug_mode"
 
 
 SEARCH_DIR = "ray_search"

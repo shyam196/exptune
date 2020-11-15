@@ -68,10 +68,10 @@ def _train_model(
         # Seeds should be independent since each run takes place inside its own ray worker
         config.configure_seeds(trial_id)
 
-        data: Any = config.data(pinned_objs, hparams, debug_mode=False)
-        model: Any = config.model(hparams, debug_mode=False)
-        optimizer: Any = config.optimizer(model, hparams, debug_mode=False)
-        extra: Any = config.extra_setup(model, optimizer, hparams, debug_mode=False)
+        data: Any = config.data(pinned_objs, hparams)
+        model: Any = config.model(hparams)
+        optimizer: Any = config.optimizer(model, hparams)
+        extra: Any = config.extra_setup(model, optimizer, hparams)
         stopper: ComposeStopper = ComposeStopper(config.stoppers())
 
         results: List[Dict[str, Any]] = []
@@ -84,12 +84,10 @@ def _train_model(
         cmp: Callable = lt if mode == "min" else gt
 
         for i in range(1, config.settings().final_max_iterations + 1):
-            t_metrics, t_extra = config.train(
-                model, optimizer, data, extra, debug_mode=False
-            )
+            t_metrics, t_extra = config.train(model, optimizer, data, extra)
             train_capture.append(t_extra)
 
-            v_metrics, v_extra = config.val(model, data, extra, debug_mode=False)
+            v_metrics, v_extra = config.val(model, data, extra)
             val_capture.append(v_extra)
 
             if best_metric is None or cmp(v_metrics[metric_name], best_metric):
@@ -113,7 +111,7 @@ def _train_model(
 
         # Restore model to the one where the best validation metric was recorded, and test
         model, optimizer, hparams, extra = config.restore_trial(results_dir)
-        test_metrics, test_extra = config.test(model, data, extra, debug_mode=False)
+        test_metrics, test_extra = config.test(model, data, extra)
         print(f"\nTrial {trial_id}:")
         pprint(test_metrics)
 
@@ -146,7 +144,7 @@ def train_final_models(
     if not check_gpu_availability() and resource_reqs.requests_gpu():
         raise ValueError("GPU required for training this model")
 
-    pinned_objs: List[ray.ObjectID] = config.dataset_pin(debug_mode=False)
+    pinned_objs: List[ray.ObjectID] = config.dataset_pin()
 
     out_dir = exp_directory / FINAL_RUNS_DIR
     if not out_dir.exists():

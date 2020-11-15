@@ -25,7 +25,6 @@ from exptune.summaries.final_run_summaries import (
     TrialCurvePlotter,
     ViolinPlotter,
 )
-from exptune.summaries.search_summaries import HyperParamReport
 
 
 def _trim_dataset_for_debug(dataset, prop=0.1):
@@ -79,16 +78,6 @@ class PytorchMnistMlpConfig(ExperimentConfig):
         # num_samples=50, metric=self.trial_metric(), max_concurrent=6
         # )
 
-    def search_summaries(self):
-        return [
-            HyperParamReport(
-                self.hyperparams(),
-                self.trial_metric(),
-                [Metric("val_accuracy", "max")],
-                "report",
-            )
-        ]
-
     def trial_scheduler(self):
         metric: Metric = self.trial_metric()
         return AsyncHyperBandScheduler(
@@ -98,7 +87,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
     def trial_metric(self):
         return Metric("val_loss", "min")
 
-    def data(self, pinned_objs, hparams, debug_mode):
+    def data(self, pinned_objs, hparams):
         transform = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
         )
@@ -123,7 +112,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
         )
 
         # if in debug mode, cut the dataset size down to a tiny fraction
-        if debug_mode:
+        if self.debug_mode:
             train_split = _trim_dataset_for_debug(train_split)
             val_split = _trim_dataset_for_debug(val_split)
             test_dataset = _trim_dataset_for_debug(train_dataset)
@@ -136,13 +125,13 @@ class PytorchMnistMlpConfig(ExperimentConfig):
             "test": DataLoader(test_dataset, batch_size=512, shuffle=False),
         }
 
-    def model(self, hparams, debug_mode):
+    def model(self, hparams):
         return MnistMlp(128, hparams["dropout"])
 
-    def optimizer(self, model, hparams, debug_mode):
+    def optimizer(self, model, hparams):
         return Adam(model.parameters(), lr=hparams["lr"])
 
-    def extra_setup(self, model, optimizer, hparams, debug_mode):
+    def extra_setup(self, model, optimizer, hparams):
         return Extra(
             device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
             lr_scheduler=ReduceLROnPlateau(optimizer),
@@ -182,13 +171,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
             extra,
         )
 
-    def trial_update_hparams(self, model, optimizer, extra, new_hparams):
-        optim = optimizer.optimizer
-        for g in optim.param_groups:
-            g["lr"] = new_hparams["lr"]
-        return True
-
-    def train(self, model, optimizer, data, extra, debug_mode):
+    def train(self, model, optimizer, data, extra):
         device = extra.device
         model.to(device)
 
@@ -216,7 +199,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
             None,
         )
 
-    def __eval(self, split, model, data, extra, debug_mode):
+    def __eval(self, split, model, data, extra):
         device = extra.device
         model.to(device)
 
@@ -240,14 +223,14 @@ class PytorchMnistMlpConfig(ExperimentConfig):
             None,
         )
 
-    def val(self, model, data, extra, debug_mode):
-        metrics, extra_output = self.__eval("val", model, data, extra, debug_mode)
+    def val(self, model, data, extra):
+        metrics, extra_output = self.__eval("val", model, data, extra)
         # Cycle the LR scheduler along
         extra.lr_scheduler.step(metrics[self.trial_metric().name])
         return metrics, extra_output
 
-    def test(self, model, data, extra, debug_mode):
-        return self.__eval("test", model, data, extra, debug_mode)
+    def test(self, model, data, extra):
+        return self.__eval("test", model, data, extra)
 
     def final_runs_summaries(self):
         return [

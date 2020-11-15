@@ -14,7 +14,6 @@ from exptune.hyperparams import HyperParam
 from exptune.search_strategies import SearchStrategy
 from exptune.utils import (
     BEST_HYPERPARAMS_FILE,
-    DEBUG_MODE_KEY,
     EXP_CONF_KEY,
     HPARAMS_KEY,
     PINNED_OID_KEY,
@@ -37,6 +36,10 @@ TData = TypeVar("TData")
 
 
 class ExperimentConfig(abc.ABC, Generic[TModel, TOpt, TExtra, TData]):
+    def __init__(self, debug_mode=False) -> None:
+        super().__init__()
+        self.debug_mode = debug_mode
+
     @abc.abstractmethod
     def settings(self) -> ExperimentSettings:
         raise NotImplementedError
@@ -70,25 +73,23 @@ class ExperimentConfig(abc.ABC, Generic[TModel, TOpt, TExtra, TData]):
     def stoppers(self) -> List[tune.Stopper]:
         return []
 
-    def dataset_pin(self, debug_mode: bool) -> List[ObjectID]:
+    def dataset_pin(self) -> List[ObjectID]:
         return []
 
     @abc.abstractmethod
-    def data(
-        self, pinned_objs: List[ObjectID], hparams: Dict[str, Any], debug_mode: bool
-    ) -> TData:
+    def data(self, pinned_objs: List[ObjectID], hparams: Dict[str, Any]) -> TData:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def model(self, hparams: Dict[str, Any], debug_mode: bool) -> TModel:
+    def model(self, hparams: Dict[str, Any]) -> TModel:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def optimizer(self, model: Any, hparams: Dict[str, Any], debug_mode: bool) -> TOpt:
+    def optimizer(self, model: Any, hparams: Dict[str, Any]) -> TOpt:
         raise NotImplementedError
 
     def extra_setup(
-        self, model: TModel, optimizer: TOpt, hparams: Dict[str, Any], debug_mode: bool,
+        self, model: TModel, optimizer: TOpt, hparams: Dict[str, Any]
     ) -> TExtra:
         return None
 
@@ -111,24 +112,19 @@ class ExperimentConfig(abc.ABC, Generic[TModel, TOpt, TExtra, TData]):
 
     @abc.abstractmethod
     def train(
-        self,
-        model: TModel,
-        optimizer: TOpt,
-        data: TData,
-        extra: TExtra,
-        debug_mode: bool,
+        self, model: TModel, optimizer: TOpt, data: TData, extra: TExtra,
     ) -> Tuple[Dict[str, Any], Any]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def val(
-        self, model: TModel, data: TData, extra: TExtra, debug_mode: bool
+        self, model: TModel, data: TData, extra: TExtra
     ) -> Tuple[Dict[str, Any], Any]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def test(
-        self, model: TModel, data: TData, extra: TExtra, debug_mode: bool
+        self, model: TModel, data: TData, extra: TExtra
     ) -> Tuple[Dict[str, Any], Any]:
         raise NotImplementedError
 
@@ -145,19 +141,14 @@ class ExperimentConfig(abc.ABC, Generic[TModel, TOpt, TExtra, TData]):
 class _ExperimentTrainable(tune.Trainable):
     def setup(self, config: Dict[str, Any]):
         self.exp_conf: ExperimentConfig = config[EXP_CONF_KEY]
-        self.debug_mode: bool = config[DEBUG_MODE_KEY]
         self.hparams: Dict[str, Any] = config[HPARAMS_KEY]
         pinned_object_ids: List[ObjectID] = config[PINNED_OID_KEY]
 
-        self.data: Any = self.exp_conf.data(
-            pinned_object_ids, self.hparams, self.debug_mode
-        )
-        self.model: Any = self.exp_conf.model(self.hparams, self.debug_mode)
-        self.optimizer: Any = self.exp_conf.optimizer(
-            self.model, self.hparams, self.debug_mode
-        )
+        self.data: Any = self.exp_conf.data(pinned_object_ids, self.hparams)
+        self.model: Any = self.exp_conf.model(self.hparams)
+        self.optimizer: Any = self.exp_conf.optimizer(self.model, self.hparams)
         self.extra: Any = self.exp_conf.extra_setup(
-            self.model, self.optimizer, self.hparams, self.debug_mode
+            self.model, self.optimizer, self.hparams
         )
 
     def reset_config(self, new_config):
@@ -179,14 +170,12 @@ class _ExperimentTrainable(tune.Trainable):
         t_metrics: Dict[str, Any]
         t_extra: Any
         t_metrics, t_extra = self.exp_conf.train(
-            self.model, self.optimizer, self.data, self.extra, self.debug_mode
+            self.model, self.optimizer, self.data, self.extra
         )
 
         v_metrics: Dict[str, Any]
         v_extra: Any
-        v_metrics, v_extra = self.exp_conf.val(
-            self.model, self.data, self.extra, self.debug_mode
-        )
+        v_metrics, v_extra = self.exp_conf.val(self.model, self.data, self.extra)
 
         self._log_extra_info(t_extra, "train")
         self._log_extra_info(v_extra, "val")
@@ -209,11 +198,7 @@ class _ExperimentTrainable(tune.Trainable):
 
 
 def run_search(
-    experiment_config: ExperimentConfig,
-    exp_directory: Path,
-    debug_mode=False,
-    verbosity=1,
-    np_seed=None,
+    experiment_config: ExperimentConfig, exp_directory: Path, verbosity=1, np_seed=None,
 ) -> Dict[str, Any]:
     settings: ExperimentSettings = experiment_config.settings()
     # Make the experiment directory
@@ -227,8 +212,7 @@ def run_search(
 
     config = {
         EXP_CONF_KEY: experiment_config,
-        DEBUG_MODE_KEY: debug_mode,
-        PINNED_OID_KEY: experiment_config.dataset_pin(debug_mode),
+        PINNED_OID_KEY: experiment_config.dataset_pin(),
     }
 
     # Set up hyperparameters
