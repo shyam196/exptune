@@ -59,11 +59,11 @@ def check_config(
     complete_metrics: DefaultDict[str, List[Any]] = defaultdict(list)
 
     try:
-        for i in range(1, epochs + 1):
+        for i in range(epochs):
             console.log(f"\n\nEpoch {i}")
-            t_metrics, t_extra = config.train(model, optimizer, data, extra)
+            t_metrics, t_extra = config.train(model, optimizer, data, extra, i)
             console.log(t_metrics, t_extra)
-            v_metrics, v_extra = config.val(model, data, extra)
+            v_metrics, v_extra = config.val(model, data, extra, i)
             console.log(v_metrics, v_extra)
 
             _add_to_collected_results(

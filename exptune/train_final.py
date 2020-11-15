@@ -83,11 +83,11 @@ def _train_model(
         metric_name, mode = metric.name, metric.mode
         cmp: Callable = lt if mode == "min" else gt
 
-        for i in range(1, config.settings().final_max_iterations + 1):
-            t_metrics, t_extra = config.train(model, optimizer, data, extra)
+        for i in range(config.settings().final_max_iterations):
+            t_metrics, t_extra = config.train(model, optimizer, data, extra, i)
             train_capture.append(t_extra)
 
-            v_metrics, v_extra = config.val(model, data, extra)
+            v_metrics, v_extra = config.val(model, data, extra, i)
             val_capture.append(v_extra)
 
             if best_metric is None or cmp(v_metrics[metric_name], best_metric):

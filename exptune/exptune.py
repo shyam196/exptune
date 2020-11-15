@@ -112,13 +112,13 @@ class ExperimentConfig(abc.ABC, Generic[TModel, TOpt, TExtra, TData]):
 
     @abc.abstractmethod
     def train(
-        self, model: TModel, optimizer: TOpt, data: TData, extra: TExtra,
+        self, model: TModel, optimizer: TOpt, data: TData, extra: TExtra, iteration: int
     ) -> Tuple[Dict[str, Any], Any]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def val(
-        self, model: TModel, data: TData, extra: TExtra
+        self, model: TModel, data: TData, extra: TExtra, iteration: int
     ) -> Tuple[Dict[str, Any], Any]:
         raise NotImplementedError
 
@@ -170,12 +170,14 @@ class _ExperimentTrainable(tune.Trainable):
         t_metrics: Dict[str, Any]
         t_extra: Any
         t_metrics, t_extra = self.exp_conf.train(
-            self.model, self.optimizer, self.data, self.extra
+            self.model, self.optimizer, self.data, self.extra, self.iteration
         )
 
         v_metrics: Dict[str, Any]
         v_extra: Any
-        v_metrics, v_extra = self.exp_conf.val(self.model, self.data, self.extra)
+        v_metrics, v_extra = self.exp_conf.val(
+            self.model, self.data, self.extra, self.iteration
+        )
 
         self._log_extra_info(t_extra, "train")
         self._log_extra_info(v_extra, "val")

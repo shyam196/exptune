@@ -171,7 +171,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
             extra,
         )
 
-    def train(self, model, optimizer, data, extra):
+    def train(self, model, optimizer, data, extra, iteration):
         device = extra.device
         model.to(device)
 
@@ -223,7 +223,7 @@ class PytorchMnistMlpConfig(ExperimentConfig):
             None,
         )
 
-    def val(self, model, data, extra):
+    def val(self, model, data, extra, iteration):
         metrics, extra_output = self.__eval("val", model, data, extra)
         # Cycle the LR scheduler along
         extra.lr_scheduler.step(metrics[self.trial_metric().name])
