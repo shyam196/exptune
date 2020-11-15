@@ -1,7 +1,7 @@
 import abc
 import pickle
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Generic, List, Tuple, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -30,8 +30,13 @@ from exptune.utils import (
     convert_experiment_analysis_to_df,
 )
 
+TModel = TypeVar("TModel")
+TOpt = TypeVar("TOpt")
+TExtra = TypeVar("TExtra")
+TData = TypeVar("TData")
 
-class ExperimentConfig(abc.ABC):
+
+class ExperimentConfig(abc.ABC, Generic[TModel, TOpt, TExtra, TData]):
     @abc.abstractmethod
     def settings(self) -> ExperimentSettings:
         raise NotImplementedError
@@ -71,54 +76,59 @@ class ExperimentConfig(abc.ABC):
     @abc.abstractmethod
     def data(
         self, pinned_objs: List[ObjectID], hparams: Dict[str, Any], debug_mode: bool
-    ) -> Any:
+    ) -> TData:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def model(self, hparams: Dict[str, Any], debug_mode: bool) -> Any:
+    def model(self, hparams: Dict[str, Any], debug_mode: bool) -> TModel:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def optimizer(self, model: Any, hparams: Dict[str, Any], debug_mode: bool) -> Any:
+    def optimizer(self, model: Any, hparams: Dict[str, Any], debug_mode: bool) -> TOpt:
         raise NotImplementedError
 
     def extra_setup(
-        self, model: Any, optimizer: Any, hparams: Dict[str, Any], debug_mode: bool,
-    ) -> Any:
+        self, model: TModel, optimizer: TOpt, hparams: Dict[str, Any], debug_mode: bool,
+    ) -> TExtra:
         return None
 
     @abc.abstractmethod
     def persist_trial(
         self,
         checkpoint_dir: Path,
-        model: Any,
-        optimizer: Any,
+        model: TModel,
+        optimizer: TOpt,
         hparams: Dict[str, Any],
-        extra: Any,
+        extra: TExtra,
     ) -> None:
         raise NotImplementedError
 
     @abc.abstractmethod
     def restore_trial(
         self, checkpoint_dir: Path
-    ) -> Tuple[Any, Any, Dict[str, Any], Any]:
+    ) -> Tuple[TModel, TOpt, Dict[str, Any], TExtra]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def train(
-        self, model: Any, optimizer: Any, data: Any, extra: Any, debug_mode: bool
+        self,
+        model: TModel,
+        optimizer: TOpt,
+        data: TData,
+        extra: TExtra,
+        debug_mode: bool,
     ) -> Tuple[Dict[str, Any], Any]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def val(
-        self, model: Any, data: Any, extra: Any, debug_mode: bool
+        self, model: TModel, data: TData, extra: TExtra, debug_mode: bool
     ) -> Tuple[Dict[str, Any], Any]:
         raise NotImplementedError
 
     @abc.abstractmethod
     def test(
-        self, model: Any, data: Any, extra: Any, debug_mode: bool
+        self, model: TModel, data: TData, extra: TExtra, debug_mode: bool
     ) -> Tuple[Dict[str, Any], Any]:
         raise NotImplementedError
 
