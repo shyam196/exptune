@@ -56,6 +56,7 @@ def _train_model(
     pinned_objs: List[ray.ObjectID],
     use_tensorboard: bool,
     print_each_epoch: bool,
+    seed_base: int,
 ) -> Optional[Tuple[pd.DataFrame, pd.DataFrame]]:
 
     try:
@@ -66,7 +67,8 @@ def _train_model(
             summary_writer = SummaryWriter(str(results_dir / "tensorboard"))
 
         # Seeds should be independent since each run takes place inside its own ray worker
-        config.configure_seeds(trial_id)
+        seed = seed_base + trial_id - 1
+        config.configure_seeds(seed)
 
         data: Any = config.data(pinned_objs, hparams)
         model: Any = config.model(hparams)
@@ -96,6 +98,7 @@ def _train_model(
 
             combined_metrics: Dict[str, Any] = {
                 "trial_id": trial_id,
+                "seed": seed,
                 "training_iteration": i,
                 **t_metrics,
                 **v_metrics,
@@ -136,6 +139,7 @@ def train_final_models(
     use_tensorboard=True,
     override_repeats=None,
     print_per_epoch=True,
+    seed_base=1,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     print("Training final models")
     settings: ExperimentSettings = config.settings()
@@ -170,6 +174,7 @@ def train_final_models(
                 pinned_objs,
                 use_tensorboard,
                 print_per_epoch,
+                seed_base,
             )
         )
 
