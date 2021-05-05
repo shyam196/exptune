@@ -3,7 +3,6 @@ from typing import Any, List
 
 
 class HyperParam(abc.ABC):
-    @property
     @abc.abstractmethod
     def default(self) -> Any:
         raise NotImplementedError
@@ -20,7 +19,7 @@ class UniformHyperParam(HyperParam):
         return self._default
 
     def __repr__(self):
-        return f"Uniform[{self.low}, {self.high}  (default={self.default})]"
+        return f"Uniform[{self.low}, {self.high}  (default={self._default})]"
 
 
 class LogUniformHyperParam(HyperParam):
@@ -34,7 +33,7 @@ class LogUniformHyperParam(HyperParam):
         return self._default
 
     def __repr__(self):
-        return f"LogUniform[{self.low}, {self.high}  (default={self.default})]"
+        return f"LogUniform[{self.low}, {self.high}  (default={self._default})]"
 
 
 class ChoiceHyperParam(HyperParam):
@@ -47,4 +46,4 @@ class ChoiceHyperParam(HyperParam):
         return self._default
 
     def __repr__(self):
-        return f"Choice[{self.choices}  (default={self.default})]"
+        return f"Choice[{self.choices}  (default={self._default})]"

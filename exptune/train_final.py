@@ -47,7 +47,7 @@ def _log_to_tensorboard(
             print(f"WARNING: Cannot write {k} (type: {type(k)}) to Tensorboard")
 
 
-@ray.remote
+@ray.remote(max_calls=1)
 def _train_model(
     config: ExperimentConfig,
     trial_id: int,
